@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Wrapped – {{ user.name or 'Shared summary' }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1419;
+            --card: #1a2332;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --jira: #2684ff;
+            --gerrit: #238636;
+            --confluence: #8250df;
+            --slack: #e01e5a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.35rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .meta {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .badge-jira {
+            background: rgba(38, 132, 255, 0.2);
+            color: #58a6ff;
+        }
+
+        .badge-gerrit {
+            background: rgba(35, 134, 54, 0.2);
+            color: #3fb950;
+        }
+
+        .badge-confluence {
+            background: rgba(130, 80, 223, 0.2);
+            color: #a371f7;
+        }
+
+        .badge-slack {
+            background: rgba(224, 30, 90, 0.2);
+            color: #f85149;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 10px;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .card strong {
+            font-size: 1.25rem;
+        }
+
+        ul {
+            margin: 0.5rem 0 0 1rem;
+            padding: 0;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Shared summary — view only</p>
+        <h1>{{ user.name or 'Work Wrapped' }}</h1>
+        <p class="meta">{{ time_range_label }} · Snapshot from {{ created_at[:10] if created_at else '—' }}</p>
+
+        <div class="grid">
+            <div class="card"><span class="badge badge-jira">Jira</span> <strong>{{ totals.jira }}</strong> tickets
+            </div>
+            <div class="card"><span class="badge badge-gerrit">Gerrit</span> <strong>{{ totals.gerrit }}</strong>
+                changes</div>
+            <div class="card"><span class="badge badge-confluence">Confluence</span> <strong>{{ totals.confluence
+                    }}</strong> pages</div>
+            <div class="card"><span class="badge badge-slack">Slack</span> <strong>{{ totals.slack }}</strong> messages
+            </div>
+        </div>
+
+        {% if highlights and highlights|length > 0 %}
+        <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">Talking points</h2>
+        <ul>
+            {% for h in highlights %}<li style="margin-bottom: 0.35rem;">{{ h }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if themes and themes|length > 0 %}
+        <h2 style="font-size: 1rem; margin: 1rem 0 0.5rem;">Top areas</h2>
+        <p>{% for t in themes %}<span class="badge badge-jira">{{ t.name }} ({{ t.count }})</span>{% endfor %}</p>
+        {% endif %}
+
+        {% if monthly and monthly|length > 0 %}
+        <h2 style="font-size: 1rem; margin: 1rem 0 0.5rem;">Activity by month</h2>
+        <p style="font-size: 0.9rem; color: var(--text-muted);">
+            {% for m in monthly %}{{ m.month }}: {{ m.jira_count or 0 }} tickets, {{ m.gerrit_count or 0 }} changes{% if
+            not loop.last %} · {% endif %}{% endfor %}
+        </p>
+        {% endif %}
+
+        <p class="footer">Work Wrapped · Shared link</p>
+    </div>
+</body>
+
+</html>

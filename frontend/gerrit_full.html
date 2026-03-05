@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}All Gerrit changes – Work Wrapped{% endblock %}
+{% block content %}
+<p style="margin-bottom: 1rem;"><a href="/?months={{ months or 12 }}" style="color: var(--accent);">← Back to
+        dashboard</a></p>
+<div class="time-filter-wrap"
+    style="display:flex; align-items:center; gap:0.75rem; margin-bottom: 1rem; flex-wrap:wrap;">
+    <label for="time-range-select" style="color: var(--text-muted); font-size: 0.9rem;">Time range</label>
+    <select id="time-range-select" onchange="location.href='{{ time_filter_path or '/gerrit' }}?months=' + this.value"
+        style="background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem;">
+        {% for m, label in time_range_options or [(12, 'Last 12 months')] %}
+        <option value="{{ m }}" {% if (months or 12)==m %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <span style="color: var(--text-muted); font-size: 0.85rem;">{{ time_range_label or 'Last 12 months' }}</span>
+</div>
+<h2 style="margin-bottom: 0.5rem;">Gerrit – detailed view</h2>
+<p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">{{ time_range_label or 'Last 12 months'
+    }} of your authored changes</p>
+
+{% if gerrit_error %}
+<div class="card">
+    <p style="color: var(--error, #f85149);">{{ gerrit_error }}</p>
+</div>
+{% elif not gerrit %}
+<div class="card">
+    <p style="color: var(--text-muted);">No changes.</p>
+</div>
+{% else %}
+
+<h3 style="font-size: 1.1rem; margin-bottom: 0.75rem;">Metrics</h3>
+<div class="grid" style="margin-bottom: 1.5rem;">
+    <div class="card"><strong>{{ gerrit_metrics.total_changes or gerrit|length }}</strong> changes</div>
+    <div class="card"><strong>{{ gerrit_metrics.merged_count or 0 }}</strong> merged · {{ gerrit_metrics.merge_rate_pct
+        or 0 }}%</div>
+    <div class="card"><strong>{{ gerrit_metrics.open_count or 0 }}</strong> open</div>
+    <div class="card"><strong>{{ gerrit_metrics.abandoned_count or 0 }}</strong> abandoned</div>
+    <div class="card"><strong>+{{ gerrit_metrics.lines_added or 0 }}</strong> / <strong>−{{ gerrit_metrics.lines_removed
+            or 0 }}</strong> lines</div>
+    <div class="card"><strong>{{ gerrit_metrics.projects_count or 0 }}</strong> projects</div>
+    {% if gerrit_metrics.avg_merge_days is not none %}
+    <div class="card"><strong>{{ gerrit_metrics.avg_merge_days }}</strong> days avg to merge</div>
+    {% endif %}
+    {% if gerrit_metrics.reviewed_count is not none and gerrit_metrics.reviewed_count > 0 %}
+    <div class="card"><strong>{{ gerrit_metrics.reviewed_count }}</strong> patches you reviewed</div>
+    {% endif %}
+</div>
+
+<div class="card ai-opportunity-card" style="margin-bottom: 1.5rem;">
+    <h3 style="margin-bottom: 0.35rem;">✨ AI insight</h3>
+    <p class="ai-opportunity-desc">With an LLM connected, you could get a brief narrative and themes from your commit
+        messages — e.g. focus areas, refactoring vs features, and a short Work Wrapped summary.</p>
+    <button type="button" class="ai-opportunity-btn" disabled
+        title="Connect an LLM to enable (see docs/LLM_COPILOT_SETUP.md)">Get AI summary of my changes</button>
+</div>
+
+{% if gerrit_metrics.lines_changed_distribution and gerrit_metrics.lines_changed_distribution_max and
+gerrit_metrics.lines_changed_distribution_max > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Lines changed per change</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Small (0–50), medium (51–200),
+        large (200+).</p>
+    <div class="gerrit-distribution-chart">
+        {% for label, count in gerrit_metrics.lines_changed_distribution %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ label }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / gerrit_metrics.lines_changed_distribution_max) }}%;"></div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if gerrit_metrics.review_balance_note %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Review balance</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">{{ gerrit_metrics.review_balance_note }}</p>
+</div>
+{% endif %}
+
+{% if gerrit_metrics.reviewed_by_month_list and gerrit_metrics.reviewed_by_month_list|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Review velocity — patches you reviewed by month</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">How many changes you reviewed each
+        month.</p>
+    <div class="gerrit-distribution-chart">
+        {% for month_key, count in gerrit_metrics.reviewed_by_month_list %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ month_key }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / gerrit_metrics.reviewed_by_month_max) if gerrit_metrics.reviewed_by_month_max else 0 }}%;">
+                </div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{# Time to merge percentiles (creation → merged) #}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Time to merge (creation → merged)</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Days from when the change was
+        created (review ready) to when it was merged — percentiles. Open p95/p99 to see which patches took that long.
+    </p>
+    {% if gerrit_metrics.merge_time_percentiles %}
+    <div class="grid" style="margin-bottom: 0;">
+        {% for pct, days in gerrit_metrics.merge_time_percentiles|dictsort %}
+        <div class="card gerrit-percentile-card" style="margin-bottom: 0.5rem;">
+            <strong>p{{ pct }}</strong> {{ days }} days
+            {% if pct == 95 and gerrit_metrics.patches_at_or_above_p95 %}
+            <details class="gerrit-percentile-details">
+                <summary>Show patches at or above p95</summary>
+                <ul class="gerrit-percentile-patches">
+                    {% for p in gerrit_metrics.patches_at_or_above_p95 %}
+                    <li><span class="badge badge-gerrit">{{ p.project or '?' }}</span> #{{ p.number }} — {{ p.delta_days
+                        }} d: {{ p.message or '(no subject)' }}{% if (p.message or '')|length >= 120 %}…{% endif %}</li>
+                    {% endfor %}
+                </ul>
+            </details>
+            {% endif %}
+            {% if pct == 99 and gerrit_metrics.patches_at_or_above_p99 %}
+            <details class="gerrit-percentile-details">
+                <summary>Show patches at or above p99</summary>
+                <ul class="gerrit-percentile-patches">
+                    {% for p in gerrit_metrics.patches_at_or_above_p99 %}
+                    <li><span class="badge badge-gerrit">{{ p.project or '?' }}</span> #{{ p.number }} — {{ p.delta_days
+                        }} d: {{ p.message or '(no subject)' }}{% if (p.message or '')|length >= 120 %}…{% endif %}</li>
+                    {% endfor %}
+                </ul>
+            </details>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="font-size: 0.85rem; color: var(--text-muted);">No merged changes with date data in this period —
+        percentiles need at least one merged change.</p>
+    {% endif %}
+</div>
+
+{# Distribution of time to merge (line/bar chart) #}
+{% if gerrit_metrics.merge_time_distribution and gerrit_metrics.merge_time_distribution_max > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Time to merge — distribution</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Number of patches by how long they
+        took to merge (created → merged)</p>
+    <div class="gerrit-distribution-chart">
+        {% for label, count in gerrit_metrics.merge_time_distribution %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ label }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / gerrit_metrics.merge_time_distribution_max) if gerrit_metrics.merge_time_distribution_max else 0 }}%;">
+                </div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{# My patches by reviewer #}
+{% if gerrit_metrics.reviewers_with_cc %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">My patches by reviewer</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Who reviewed or was CC on your
+        changes, and how many comments they left.</p>
+    <div class="gerrit-reviewers-table-wrap">
+        <table class="gerrit-reviewers-table">
+            <thead>
+                <tr>
+                    <th>Person</th>
+                    <th>As reviewer</th>
+                    <th>As CC</th>
+                    <th>Total patches</th>
+                    <th>Comments</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for name, as_reviewer, as_cc in gerrit_metrics.reviewers_with_cc %}
+                <tr>
+                    <td>{{ name }}</td>
+                    <td>{{ as_reviewer }}</td>
+                    <td>{{ as_cc }}</td>
+                    <td><strong>{{ as_reviewer + as_cc }}</strong></td>
+                    <td>{{ gerrit_metrics.reviewer_comment_counts.get(name, 0) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if gerrit_metrics.reviewer_comment_counts %}
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; margin-bottom: 0;">Comment counts are
+        from the last 80 changes.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% if gerrit_metrics.top_reviewers and not gerrit_metrics.reviewers_with_cc %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">My patches by reviewer</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in gerrit_metrics.top_reviewers %}
+        <span class="badge badge-gerrit" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+
+{% if gerrit_metrics.per_root_merge %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Avg days to merge by path</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for root, days, count in gerrit_metrics.per_root_merge %}
+        <span class="badge badge-jira" style="margin-right: 0.25rem;">{{ root }} ({{ days }}d, {{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+
+{% if gerrit_metrics.top_branches %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Top branches</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in gerrit_metrics.top_branches %}
+        <span class="badge badge-gerrit" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+
+{# Activity over time — descriptive timeline #}
+{% if gerrit_metrics.timeline_months %}
+<div class="card gerrit-timeline-card">
+    <h3 class="gerrit-timeline-title">Activity over time</h3>
+    <p class="gerrit-timeline-desc">Your changes by month — when you were most active ({{ time_range_label or 'Last 12
+        months' }}).</p>
+    <div class="gerrit-timeline-chart">
+        {% for month_key, label, count in gerrit_metrics.timeline_months %}
+        <div class="gerrit-timeline-row">
+            <span class="gerrit-timeline-month">{{ label }}</span>
+            <div class="gerrit-timeline-bar-wrap">
+                <div class="gerrit-timeline-bar"
+                    style="width: {{ (100 * count / gerrit_metrics.timeline_max_count) if gerrit_metrics.timeline_max_count else 0 }}%;"
+                    title="{{ count }} changes"></div>
+            </div>
+            <span class="gerrit-timeline-count">{{ count }} change{{ 's' if count != 1 else '' }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="gerrit-timeline-footer">Total: <strong>{{ gerrit|length }}</strong> changes in this period.</p>
+</div>
+{% endif %}
+
+{# Full list #}
+<h3 style="margin: 2rem 0 0.5rem;">All changes</h3>
+<div class="card" style="margin-bottom: 0.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+    <strong>{{ gerrit|length }}</strong> changes
+    <label style="font-size: 0.85rem; color: var(--text-muted);">Search <input type="search" id="gerrit-filter-search"
+            placeholder="Project or subject…" style="margin-left: 0.25rem; width: 14rem;"></label>
+    <label style="font-size: 0.85rem; color: var(--text-muted);">Project <select id="gerrit-filter-project"
+            style="margin-left: 0.25rem;">
+            <option value="">All</option>{% for g in gerrit|groupby('project') %}<option value="{{ g.grouper or '' }}">
+                {{ g.grouper or '—' }}</option>{% endfor %}
+        </select></label>
+    <label style="font-size: 0.85rem; color: var(--text-muted);">Branch <select id="gerrit-filter-branch"
+            style="margin-left: 0.25rem;">
+            <option value="">All</option>{% for g in gerrit|groupby('branch') %}<option value="{{ g.grouper or '' }}">{{
+                g.grouper or '—' }}</option>{% endfor %}
+        </select></label>
+</div>
+<div id="gerrit-list">
+    {% for c in gerrit|reverse %}
+    <div class="card gerrit-change-card" data-project="{{ c.project or '' }}" data-branch="{{ c.branch or '' }}"
+        data-search="{{ (c.project or '') ~ ' ' ~ (c.path_root or '') ~ ' ' ~ (c.message or '') }}">
+        <span class="badge badge-gerrit">{{ c.project or c.path_root or c.path }}</span>
+        {% if c.status %}<span class="badge badge-slack" style="margin-left: 0.5rem;">{{ c.status }}</span>{% endif %}
+        <p style="margin: 0.5rem 0 0;">{{ c.message }}</p>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+            {{ c.branch or '—' }} · {{ c.created or c.month }}
+            {% if c.reviewers %} · reviewers:
+            {% for r in c.reviewers %}<span class="badge badge-gerrit" style="margin-right: 0.25rem;">{{ r }}</span>{%
+            endfor %}
+            {% endif %}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+    (function () {
+        var search = document.getElementById('gerrit-filter-search');
+        var proj = document.getElementById('gerrit-filter-project');
+        var branch = document.getElementById('gerrit-filter-branch');
+        var cards = document.querySelectorAll('.gerrit-change-card');
+        if (!cards.length) return;
+        function filter() {
+            var q = (search && search.value || '').toLowerCase();
+            var p = (proj && proj.value || '').toLowerCase();
+            var b = (branch && branch.value || '').toLowerCase();
+            cards.forEach(function (card) {
+                var show = true;
+                if (q && (card.getAttribute('data-search') || '').toLowerCase().indexOf(q) === -1) show = false;
+                if (p && (card.getAttribute('data-project') || '').toLowerCase() !== p) show = false;
+                if (b && (card.getAttribute('data-branch') || '').toLowerCase() !== b) show = false;
+                card.style.display = show ? '' : 'none';
+            });
+        }
+        if (search) search.addEventListener('input', filter);
+        if (proj) proj.addEventListener('change', filter);
+        if (branch) branch.addEventListener('change', filter);
+    })();
+</script>
+{% endblock %}

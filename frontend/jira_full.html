@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+{% block title %}All Jira tickets – Work Wrapped{% endblock %}
+{% block content %}
+<p style="margin-bottom: 1rem;"><a href="/?months={{ months or 12 }}" style="color: var(--accent);">← Back to
+        dashboard</a></p>
+<div class="time-filter-wrap"
+    style="display:flex; align-items:center; gap:0.75rem; margin-bottom: 1rem; flex-wrap:wrap;">
+    <label for="time-range-select" style="color: var(--text-muted); font-size: 0.9rem;">Time range</label>
+    <select id="time-range-select" onchange="location.href='{{ time_filter_path or '/jira' }}?months=' + this.value"
+        style="background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem;">
+        {% for m, label in time_range_options or [(12, 'Last 12 months')] %}
+        <option value="{{ m }}" {% if (months or 12)==m %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <span style="color: var(--text-muted); font-size: 0.85rem;">{{ time_range_label or 'Last 12 months' }}</span>
+</div>
+<h2 style="margin-bottom: 0.5rem;">Jira – detailed view</h2>
+<p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Assigned to or created by you, updated {{
+    time_range_label or 'in the last 12 months' }}</p>
+{% if jira_error %}
+<div class="card">
+    <p style="color: var(--error, #f85149);">{{ jira_error }}</p>
+</div>
+{% elif not jira_connected %}
+<div class="card">
+    <p style="color: var(--text-muted);">Add Jira at login to see tickets.</p>
+</div>
+{% elif not jira %}
+<div class="card">
+    <p style="color: var(--text-muted);">No tickets.</p>
+</div>
+{% else %}
+<div class="grid" style="margin-bottom: 1.5rem;">
+    <div class="card"><strong>{{ jira_metrics.total_tickets or jira|length }}</strong> tickets</div>
+    {% if jira_metrics.created_by_me is defined %}<div class="card"><strong>{{ jira_metrics.created_by_me }}</strong>
+        created by me</div>{% endif %}
+    {% if jira_metrics.assigned_to_me is defined %}<div class="card"><strong>{{ jira_metrics.assigned_to_me }}</strong>
+        assigned to me</div>{% endif %}
+    {% if jira_metrics.created_by_me_assigned_to_other is defined %}<div class="card"><strong>{{
+            jira_metrics.created_by_me_assigned_to_other }}</strong> created by me, assigned to others</div>{% endif %}
+    <div class="card"><strong>{{ jira_metrics.done_count or 0 }}</strong> done · {{ jira_metrics.done_rate_pct or 0 }}%
+    </div>
+    <div class="card"><strong>{{ jira_metrics.open_count or 0 }}</strong> open</div>
+    <div class="card"><strong>{{ jira_metrics.projects_count or 0 }}</strong> projects</div>
+</div>
+
+<div class="card ai-opportunity-card" style="margin-bottom: 1.5rem;">
+    <h3 style="margin-bottom: 0.35rem;">✨ AI insight</h3>
+    <p class="ai-opportunity-desc">With an LLM connected, you could get a brief summary and themes from your ticket
+        titles — e.g. main focus areas, types of work, and a short narrative for your Work Wrapped.</p>
+    <button type="button" class="ai-opportunity-btn" disabled
+        title="Connect an LLM to enable (see docs/LLM_COPILOT_SETUP.md)">Get AI summary of my tickets</button>
+</div>
+
+{% if jira_metrics.tickets_with_review_count is not none or jira_metrics.median_days_in_review is not none or
+jira_metrics.avg_cycle_days is not none %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Review & cycle time</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+        {% if jira_metrics.tickets_with_review_count is not none %}{{ jira_metrics.tickets_with_review_count }} ticket{{
+        's' if jira_metrics.tickets_with_review_count != 1 else '' }} had time in review.{% endif %}
+        {% if jira_metrics.median_days_in_review is not none %} Median time in review: <strong>{{
+            jira_metrics.median_days_in_review }}</strong> days.{% endif %}
+        {% if jira_metrics.p95_days_in_review is not none %} p95: {{ jira_metrics.p95_days_in_review }} days.{% endif %}
+        {% if jira_metrics.avg_cycle_days is not none %} Average cycle time (created → done): <strong>{{
+            jira_metrics.avg_cycle_days }}</strong> days.{% endif %}
+        {% if jira_metrics.median_cycle_days is not none %} Median: {{ jira_metrics.median_cycle_days }} days.{% endif
+        %}
+    </p>
+</div>
+{% endif %}
+
+{% if jira_metrics.longest_in_review and jira_metrics.longest_in_review|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Tickets that spent longest in review</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Top 5 by days in &quot;In
+        Review&quot;.</p>
+    <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.9rem;">
+        {% for t in jira_metrics.longest_in_review %}
+        <li style="margin-bottom: 0.35rem;">
+            {% if jira_url and t.key %}<a href="{{ jira_url.rstrip('/') }}/browse/{{ t.key }}" target="_blank"
+                rel="noopener" style="color: var(--accent);">{{ t.key }}</a>{% else %}<span class="badge badge-jira">{{
+                t.key }}</span>{% endif %}
+            {{ t.title or '(no summary)' }}{% if t.days_in_review is not none %} — <strong>{{ t.days_in_review
+                }}</strong> days in review{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% if jira_metrics.median_time_to_done_by_epic and jira_metrics.median_time_to_done_by_epic|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Median time to done by Epic Link</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Which epics you closed faster or
+        slower (median days from creation to resolution).</p>
+    <div class="jira-epic-metrics">
+        {% for name, median_days, count in jira_metrics.median_time_to_done_by_epic %}
+        <div class="jira-epic-row">
+            <span class="jira-epic-name" title="{{ name }}">{{ name }}</span>
+            <span class="jira-epic-count">{{ median_days }}d median ({{ count }} ticket{{ 's' if count != 1 else ''
+                }})</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if jira_metrics.top_epics %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Tickets by Epic Link</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Number of tickets you worked on
+        (assigned to or created by you) per Epic Link.</p>
+    <div class="jira-epic-metrics">
+        {% for name, count in jira_metrics.top_epics %}
+        <div class="jira-epic-row">
+            <span class="jira-epic-name" title="{{ name }}">{{ name }}</span>
+            <span class="jira-epic-count">{{ count }} ticket{{ 's' if count != 1 else '' }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% if jira_metrics.epics_count is defined %}
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; margin-bottom: 0;">{{
+        jira_metrics.epics_count }} Epic Link{{ 's' if jira_metrics.epics_count != 1 else '' }} in this period.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if jira_metrics.top_labels and jira_metrics.top_labels|length > 0 %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By label</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in jira_metrics.top_labels %}
+        <span class="badge badge-jira" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+{% if jira_metrics.top_components and jira_metrics.top_components|length > 0 %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By component</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in jira_metrics.top_components %}
+        <span class="badge badge-confluence" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+{% if jira_metrics.top_priorities and jira_metrics.top_priorities|length > 0 %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By priority</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in jira_metrics.top_priorities %}
+        <span class="badge badge-slack" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+{% if jira_metrics.top_sprints and jira_metrics.top_sprints|length > 0 %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By sprint</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in jira_metrics.top_sprints %}
+        <span class="badge badge-gerrit" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+{% if jira_metrics.time_to_first_response_distribution and jira_metrics.time_to_first_response_distribution_max and
+jira_metrics.time_to_first_response_distribution_max > 0 %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">First response time</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Days from ticket creation to first
+        activity (e.g. comment or status change).</p>
+    <div class="gerrit-distribution-chart">
+        {% for label, count in jira_metrics.time_to_first_response_distribution %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ label }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / jira_metrics.time_to_first_response_distribution_max) }}%;"></div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% if jira_metrics.time_to_first_response_percentiles %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; margin-bottom: 0;">Median: {{
+        jira_metrics.time_to_first_response_percentiles.get(50, '—') }} days.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if jira_metrics.top_statuses %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By status</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in jira_metrics.top_statuses %}
+        <span class="badge badge-jira" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+
+{% if jira_metrics.top_issuetypes %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By type</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in jira_metrics.top_issuetypes %}
+        <span class="badge badge-confluence" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+
+{% if jira_metrics.who_grabbed %}
+<div class="card">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Who grabbed my tickets</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in jira_metrics.who_grabbed %}
+        <span class="badge badge-slack" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+
+{# Time to resolution (creation → done/merged) #}
+{% if jira_metrics.time_to_resolution_distribution and jira_metrics.time_to_resolution_distribution_max > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Time to done (creation → resolved)</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">How long tickets took from creation
+        to resolution (Done/Resolved/Closed).</p>
+    <div class="gerrit-distribution-chart">
+        {% for label, count in jira_metrics.time_to_resolution_distribution %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ label }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / jira_metrics.time_to_resolution_distribution_max) if jira_metrics.time_to_resolution_distribution_max else 0 }}%;">
+                </div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% if jira_metrics.time_to_resolution_percentiles %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.75rem; margin-bottom: 0;">Percentiles: {% for
+        pct, days in jira_metrics.time_to_resolution_percentiles|dictsort %}p{{ pct }} {{ days }}d{% if not loop.last %}
+        · {% endif %}{% endfor %}</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{# Time to done (assigned → resolved) — always show section when we have Jira #}
+{% if jira %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Time to done (assigned → resolved)</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">How long tickets took from
+        <strong>first assignment</strong> to resolution (Done/Resolved/Closed).
+    </p>
+    {% if jira_metrics.time_assigned_to_resolution_distribution and
+    jira_metrics.time_assigned_to_resolution_distribution_max > 0 %}
+    <div class="gerrit-distribution-chart">
+        {% for label, count in jira_metrics.time_assigned_to_resolution_distribution %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ label }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / jira_metrics.time_assigned_to_resolution_distribution_max) if jira_metrics.time_assigned_to_resolution_distribution_max else 0 }}%;">
+                </div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% if jira_metrics.time_assigned_to_resolution_percentiles %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.75rem; margin-bottom: 0;">Percentiles: {% for
+        pct, days in jira_metrics.time_assigned_to_resolution_percentiles|dictsort %}p{{ pct }} {{ days }}d{% if not
+        loop.last %} · {% endif %}{% endfor %}</p>
+    {% endif %}
+    {% else %}
+    <p class="jira-timing-no-data">No data yet. This metric needs issue <strong>changelog</strong>. Set
+        <code>JIRA_INCLUDE_CHANGELOG=true</code> in your <code>.env</code> file and restart the app, then reload this
+        page.
+    </p>
+    {% endif %}
+</div>
+{% endif %}
+
+{# Time to grab (creation → first assignment) — always show section when we have Jira #}
+{% if jira %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Time to grab (creation → first assignment)</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">How long after creation a ticket
+        was first assigned to someone.</p>
+    {% if jira_metrics.time_to_grab_distribution and jira_metrics.time_to_grab_distribution_max > 0 %}
+    <div class="gerrit-distribution-chart">
+        {% for label, count in jira_metrics.time_to_grab_distribution %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ label }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / jira_metrics.time_to_grab_distribution_max) if jira_metrics.time_to_grab_distribution_max else 0 }}%;">
+                </div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% if jira_metrics.time_to_grab_percentiles %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.75rem; margin-bottom: 0;">Percentiles: {% for
+        pct, days in jira_metrics.time_to_grab_percentiles|dictsort %}p{{ pct }} {{ days }}d{% if not loop.last %} · {%
+        endif %}{% endfor %}</p>
+    {% endif %}
+    {% else %}
+    <p class="jira-timing-no-data">No data yet. This metric needs issue <strong>changelog</strong>. Set
+        <code>JIRA_INCLUDE_CHANGELOG=true</code> in your <code>.env</code> file and restart the app, then reload this
+        page.
+    </p>
+    {% endif %}
+</div>
+{% endif %}
+
+{# Time under review (days in "In Review" status) — always show section when we have Jira #}
+{% if jira %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Time under review</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">How long tickets spent in &quot;In
+        Review&quot; (or any status whose name contains &quot;Review&quot;) before moving on.</p>
+    {% if jira_metrics.time_in_review_distribution and jira_metrics.time_in_review_distribution_max > 0 %}
+    <div class="gerrit-distribution-chart">
+        {% for label, count in jira_metrics.time_in_review_distribution %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ label }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / jira_metrics.time_in_review_distribution_max) if jira_metrics.time_in_review_distribution_max else 0 }}%;">
+                </div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% if jira_metrics.time_in_review_percentiles %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.75rem; margin-bottom: 0;">Percentiles: {% for
+        pct, days in jira_metrics.time_in_review_percentiles|dictsort %}p{{ pct }} {{ days }}d{% if not loop.last %} ·
+        {% endif %}{% endfor %}</p>
+    {% endif %}
+    {% else %}
+    <p class="jira-timing-no-data">No data yet. This metric needs issue <strong>changelog</strong> and status names
+        containing &quot;Review&quot;. Set <code>JIRA_INCLUDE_CHANGELOG=true</code> in your <code>.env</code> file and
+        restart the app, then reload this page.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{# Activity over time — descriptive timeline (same style as Gerrit) #}
+{% if jira_metrics.timeline_months %}
+<div class="card gerrit-timeline-card jira-timeline-card">
+    <h3 class="gerrit-timeline-title">Activity over time</h3>
+    <p class="gerrit-timeline-desc">Your tickets by month — when you were most active ({{ time_range_label or 'Last 12
+        months' }}).</p>
+    <div class="gerrit-timeline-chart">
+        {% for month_key, label, count in jira_metrics.timeline_months %}
+        <div class="gerrit-timeline-row">
+            <span class="gerrit-timeline-month">{{ label }}</span>
+            <div class="gerrit-timeline-bar-wrap">
+                <div class="gerrit-timeline-bar jira-timeline-bar"
+                    style="width: {{ (100 * count / jira_metrics.timeline_max_count) if jira_metrics.timeline_max_count else 0 }}%;"
+                    title="{{ count }} tickets"></div>
+            </div>
+            <span class="gerrit-timeline-count">{{ count }} ticket{{ 's' if count != 1 else '' }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="gerrit-timeline-footer">Total: <strong>{{ jira|length }}</strong> tickets in this period.</p>
+</div>
+{% endif %}
+
+<h3 style="margin: 2rem 0 0.5rem;">All tickets</h3>
+<div class="card" style="margin-bottom: 0.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+    <strong>{{ jira|length }}</strong> tickets
+    <label style="font-size: 0.85rem; color: var(--text-muted);">Search <input type="search" id="jira-filter-search"
+            placeholder="Key or title…" style="margin-left: 0.25rem; width: 12rem;"></label>
+    <label style="font-size: 0.85rem; color: var(--text-muted);">Project <select id="jira-filter-project"
+            style="margin-left: 0.25rem;">
+            <option value="">All</option>{% for g in jira|groupby('project') %}<option value="{{ g.grouper or '' }}">{{
+                g.grouper or '—' }}</option>{% endfor %}
+        </select></label>
+    <label style="font-size: 0.85rem; color: var(--text-muted);">Status <select id="jira-filter-status"
+            style="margin-left: 0.25rem;">
+            <option value="">All</option>{% for g in jira|groupby('status') %}<option value="{{ g.grouper or '' }}">{{
+                g.grouper or '—' }}</option>{% endfor %}
+        </select></label>
+</div>
+<div id="jira-list">
+    {% for t in jira|reverse %}
+    <div class="card jira-ticket-card" data-project="{{ t.project or '' }}" data-status="{{ t.status or '' }}"
+        data-search="{{ (t.key or '') ~ ' ' ~ (t.title or '') }}">
+        <span class="badge badge-jira">{{ t.key }}</span>
+        {% if t.status %}<span class="badge badge-slack" style="margin-left: 0.5rem;">{{ t.status }}</span>{% endif %}
+        {% if t.epic_label %}<span class="badge badge-confluence" style="margin-left: 0.5rem;" title="Epic Link">{{
+            t.epic_label }}</span>{% endif %}
+        <p style="margin: 0.5rem 0 0;">{{ t.title or '(no summary)' }}</p>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+            {{ t.project }} · {{ t.month }}
+            {% if t.assignee_display or t.reporter_display %} · assigned: {{ t.assignee_display or '—' }} · reporter: {{
+            t.reporter_display or '—' }}{% endif %}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+    (function () {
+        var search = document.getElementById('jira-filter-search');
+        var proj = document.getElementById('jira-filter-project');
+        var status = document.getElementById('jira-filter-status');
+        var cards = document.querySelectorAll('.jira-ticket-card');
+        function filter() {
+            var q = (search && search.value || '').toLowerCase();
+            var p = (proj && proj.value || '').toLowerCase();
+            var s = (status && status.value || '').toLowerCase();
+            cards.forEach(function (card) {
+                var show = true;
+                if (q && (card.getAttribute('data-search') || '').toLowerCase().indexOf(q) === -1) show = false;
+                if (p && (card.getAttribute('data-project') || '').toLowerCase() !== p) show = false;
+                if (s && (card.getAttribute('data-status') || '').toLowerCase() !== s) show = false;
+                card.style.display = show ? '' : 'none';
+            });
+        }
+        if (search) search.addEventListener('input', filter);
+        if (proj) proj.addEventListener('change', filter);
+        if (status) status.addEventListener('change', filter);
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Confluence pages – Work Wrapped{% endblock %}
+{% block content %}
+<p style="margin-bottom: 1rem;"><a href="/?months={{ months or 12 }}" style="color: var(--accent);">← Back to
+        dashboard</a></p>
+<div class="time-filter-wrap"
+    style="display:flex; align-items:center; gap:0.75rem; margin-bottom: 1rem; flex-wrap:wrap;">
+    <label for="time-range-select" style="color: var(--text-muted); font-size: 0.9rem;">Time range</label>
+    <select id="time-range-select"
+        onchange="location.href='{{ time_filter_path or '/confluence' }}?months=' + this.value"
+        style="background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem;">
+        {% for m, label in time_range_options or [(12, 'Last 12 months')] %}
+        <option value="{{ m }}" {% if (months or 12)==m %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <span style="color: var(--text-muted); font-size: 0.85rem;">{{ time_range_label or 'Last 12 months' }}</span>
+</div>
+<h2 style="margin-bottom: 0.5rem;">Confluence – detailed view</h2>
+<p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Pages you created or updated {{
+    time_range_label or 'in the last 12 months' }}</p>
+
+{% if confluence_error %}
+<div class="card">
+    <p style="color: var(--error, #f85149);">{{ confluence_error }}</p>
+</div>
+{% elif not confluence_connected %}
+<div class="card">
+    <p style="color: var(--text-muted);">Add Confluence (or Jira) credentials at login to see pages.</p>
+</div>
+{% elif not confluence %}
+<div class="card">
+    <p style="color: var(--text-muted);">No pages.</p>
+</div>
+{% else %}
+<div class="grid" style="margin-bottom: 1.5rem;">
+    <div class="card"><strong>{{ confluence|length }}</strong> pages</div>
+    <div class="card"><span class="badge badge-confluence">Confluence</span> {{ totals.confluence or confluence|length
+        }}</div>
+    {% if confluence_metrics.created_count is not none %}<div class="card"><strong>{{ confluence_metrics.created_count
+            }}</strong> created in period</div>{% endif %}
+    {% if confluence_metrics.updated_count is not none %}<div class="card"><strong>{{ confluence_metrics.updated_count
+            }}</strong> with activity (updated)</div>{% endif %}
+</div>
+
+<div class="card ai-opportunity-card" style="margin-bottom: 1.5rem;">
+    <h3 style="margin-bottom: 0.35rem;">✨ AI insight</h3>
+    <p class="ai-opportunity-desc">With an LLM connected, you could get topic categories and a short summary from your
+        page titles — e.g. documentation themes, areas you contributed to, and a brief narrative for your year in
+        review.</p>
+    <button type="button" class="ai-opportunity-btn" disabled
+        title="Connect an LLM to enable (see docs/LLM_COPILOT_SETUP.md)">Categorize & summarize with AI</button>
+</div>
+
+{% if confluence_metrics.top_spaces and confluence_metrics.top_spaces|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Top spaces</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for name, count in confluence_metrics.top_spaces %}
+        <span class="badge badge-confluence" style="margin-right: 0.25rem;">{{ name }} ({{ count }})</span>
+        {% endfor %}
+    </p>
+</div>
+{% endif %}
+
+{% if confluence_metrics.by_space_month and confluence_metrics.by_space_month|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Pages by space over time</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Updates per space per month.</p>
+    <div class="gerrit-distribution-chart">
+        {% for space, month, count in confluence_metrics.by_space_month[:24] %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ space }} {{ month }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / confluence_metrics.by_space_month_max) if confluence_metrics.by_space_month_max else 0 }}%;">
+                </div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% if confluence_metrics.by_space_month|length > 24 %}
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">Showing first 24 rows.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if confluence_metrics.most_edited_pages and confluence_metrics.most_edited_pages|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Most edited pages</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">By version count (top 10).</p>
+    <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.9rem;">
+        {% for p in confluence_metrics.most_edited_pages %}
+        <li style="margin-bottom: 0.35rem;">
+            {% if p.link %}<a href="{{ p.link }}" target="_blank" rel="noopener" style="color: var(--accent);">{{
+                p.title or '(no title)' }}</a>{% else %}{{ p.title or '(no title)' }}{% endif %}
+            <span class="badge badge-confluence" style="margin-left: 0.25rem;">{{ p.space or '?' }}</span> · v{{
+            p.version_number or '?' }}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% if confluence_metrics.llm_categories and confluence_metrics.llm_categories|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">LLM categories from page titles</h3>
+    {% if confluence_metrics.llm_summary %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">{{ confluence_metrics.llm_summary
+        }}</p>
+    {% endif %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+        {% for c in confluence_metrics.llm_categories %}
+        <span class="badge badge-confluence"
+            style="margin-right: 0.25rem; margin-bottom: 0.25rem; display: inline-block;">{{ c.name }} ({{ c.count
+            }})</span>
+        {% endfor %}
+    </p>
+    {% for c in confluence_metrics.llm_categories %}
+    {% if c.examples and c.examples|length > 0 %}
+    <div style="margin-bottom: 0.5rem;">
+        <strong style="font-size: 0.85rem;">{{ c.name }}</strong>
+        <ul style="margin: 0.3rem 0 0 1rem; padding: 0; color: var(--text-muted); font-size: 0.82rem;">
+            {% for ex in c.examples %}
+            <li>{{ ex }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if confluence_metrics.last_updated_by_month and confluence_metrics.last_updated_by_month|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Last updated — by month</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Pages you updated per month.</p>
+    <div class="gerrit-distribution-chart">
+        {% for month_key, count in confluence_metrics.last_updated_by_month %}
+        <div class="gerrit-distribution-row">
+            <span class="gerrit-distribution-label">{{ month_key }}</span>
+            <div class="gerrit-distribution-bar-bg">
+                <div class="gerrit-distribution-bar"
+                    style="width: {{ (100 * count / confluence_metrics.last_updated_by_month_max) if confluence_metrics.last_updated_by_month_max else 0 }}%;">
+                </div>
+            </div>
+            <span class="gerrit-distribution-value">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if confluence_metrics.last_updated_by_month and confluence_metrics.last_updated_by_month|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By month</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for month_key, count in confluence_metrics.last_updated_by_month %}
+        <span class="badge badge-confluence" style="margin-right: 0.25rem;">{{ month_key }} · {{ count }}</span>
+        {% endfor %}
+    </p>
+</div>
+{% elif monthly %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By month</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        {% for m in monthly %}
+        {% if m.confluence_count %}<span class="badge badge-confluence" style="margin-right: 0.25rem;">{{ m.month }} ·
+            {{ m.confluence_count }}</span>{% endif %}
+        {% endfor %}
+    </p>
+</div>
+{% elif confluence and confluence|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By month</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">{{ confluence|length }} pages in this period (month
+        breakdown not available from Confluence API).</p>
+</div>
+{% endif %}
+
+<h3 style="margin: 1rem 0 0.5rem;">All pages</h3>
+<div class="card" style="margin-bottom: 0.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+    <strong>{{ confluence|length }}</strong> pages
+    <label style="font-size: 0.85rem; color: var(--text-muted);">Search <input type="search"
+            id="confluence-filter-search" placeholder="Title…" style="margin-left: 0.25rem; width: 12rem;"></label>
+    <label style="font-size: 0.85rem; color: var(--text-muted);">Space <select id="confluence-filter-space"
+            style="margin-left: 0.25rem;">
+            <option value="">All</option>{% for g in confluence|groupby('space') %}<option
+                value="{{ g.grouper or '' }}">{{ g.grouper or '—' }}</option>{% endfor %}
+        </select></label>
+</div>
+<div id="confluence-list">
+    {% for p in confluence|reverse %}
+    <div class="card confluence-page-card" data-space="{{ p.space or p.space_key or '' }}"
+        data-search="{{ (p.title or '') }}">
+        <span class="badge badge-confluence">{{ p.space or p.space_key or '?' }}</span>
+        {% if p.link %}<a href="{{ p.link }}" target="_blank" rel="noopener"
+            style="color: var(--accent); margin-left: 0.5rem;">{{ p.title or '(no title)' }}</a>{% else %}<span
+            style="margin-left: 0.5rem;">{{ p.title or '(no title)' }}</span>{% endif %}
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem;">{{ p.updated or p.month or '—' }}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+    (function () {
+        var search = document.getElementById('confluence-filter-search');
+        var space = document.getElementById('confluence-filter-space');
+        var cards = document.querySelectorAll('.confluence-page-card');
+        if (!cards.length) return;
+        function filter() {
+            var q = (search && search.value || '').toLowerCase();
+            var s = (space && space.value || '').toLowerCase();
+            cards.forEach(function (card) {
+                var show = true;
+                if (q && (card.getAttribute('data-search') || '').toLowerCase().indexOf(q) === -1) show = false;
+                if (s && (card.getAttribute('data-space') || '').toLowerCase() !== s) show = false;
+                card.style.display = show ? '' : 'none';
+            });
+        }
+        if (search) search.addEventListener('input', filter);
+        if (space) space.addEventListener('change', filter);
+    })();
+</script>
+{% endblock %}

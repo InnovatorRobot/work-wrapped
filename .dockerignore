@@ -1,0 +1,34 @@
+# .env is included in the image when present (so you can share a preconfigured image)
+# To exclude .env from the image, uncomment the next line:
+# .env
+
+# Local user data (goals, snapshots, shared links) — never bake into image
+data/
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+.cursorignore
+*.md
+!README.md
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv
+.venv
+env
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+.docker
+
+# Misc
+*.log
+.DS_Store

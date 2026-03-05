@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Teams – Work Wrapped{% endblock %}
+{% block content %}
+<p style="margin-bottom: 1rem;"><a href="/?months={{ months or 12 }}" style="color: var(--accent);">← Back to
+        dashboard</a></p>
+<div class="time-filter-wrap"
+    style="display:flex; align-items:center; gap:0.75rem; margin-bottom: 1rem; flex-wrap:wrap;">
+    <label for="time-range-select" style="color: var(--text-muted); font-size: 0.9rem;">Time range</label>
+    <select id="time-range-select" onchange="location.href='{{ time_filter_path or '/teams' }}?months=' + this.value"
+        style="background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem;">
+        {% for m, label in time_range_options or [(12, 'Last 12 months')] %}
+        <option value="{{ m }}" {% if (months or 12)==m %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <span style="color: var(--text-muted); font-size: 0.85rem;">{{ time_range_label or 'Last 12 months' }}</span>
+</div>
+<h2 style="margin-bottom: 0.5rem;">Microsoft Teams – chats & meetings</h2>
+<p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Your Teams messages and meeting activity
+    {{ time_range_label or 'in the last 12 months' }}</p>
+
+<div class="card">
+    <p style="color: var(--text-muted);">Connect Microsoft Teams at login (Microsoft 365) to see your chats and meeting
+        activity here.</p>
+</div>
+
+<div class="card ai-opportunity-card" style="margin-bottom: 1.5rem;">
+    <h3 style="margin-bottom: 0.35rem;">✨ AI insight</h3>
+    <p class="ai-opportunity-desc">With an LLM connected, you could get themes and a brief summary from your Teams
+        activity — e.g. main topics, collaboration focus, and a short narrative for your Work Wrapped.</p>
+    <button type="button" class="ai-opportunity-btn" disabled
+        title="Connect an LLM to enable (see docs/LLM_COPILOT_SETUP.md)">Get AI summary of my Teams activity</button>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">When & how you message</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">— Connect Teams at login to see peak
+        hour, peak day, thread vs channel counts, and reactions.</p>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Messages by channel / chat — most active</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Channels and chats where you sent
+        the most messages.</p>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">— Connect Teams to see your top channels and chats.</p>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Messages over time</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Your Teams messages per month.</p>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">— Connect Teams to see messages by month.</p>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Meetings</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Meetings attended or organized.</p>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">— Connect Teams to see your meeting activity.</p>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">By month (dashboard)</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">— Connect Teams to see message and meeting counts by month.
+    </p>
+</div>
+{% endblock %}

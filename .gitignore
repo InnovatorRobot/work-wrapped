@@ -1,0 +1,47 @@
+# Local data (goals, team opt-in, team metrics, shared links)
+data/
+
+# Secrets and local overrides (never commit). .env.example is committed as a template.
+.env
+.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+IDEAS.md
+PRESENTATION.md
+
+# WeasyPrint / cairo (optional, if you build docs locally)
+# *.pdf

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Work Wrapped</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1419;
+            --card: #1a2332;
+            --card-hover: #243044;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --accent-soft: rgba(88, 166, 255, 0.15);
+            --error: #f85149;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .login-box {
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 360px;
+        }
+
+        .login-box h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .login-box .subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.35rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            padding: 0.6rem 0.75rem;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+
+        .error {
+            color: var(--error);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+        }
+
+        button[type="submit"] {
+            width: 100%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 0.65rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        button[type="submit"]:hover {
+            background: #79b8ff;
+        }
+
+        .demo-hint {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .demo-hint code {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 0.1rem 0.3rem;
+            border-radius: 4px;
+        }
+
+        .credential-note {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            padding: 0.6rem 0.75rem;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 6px;
+            border-left: 3px solid var(--accent);
+        }
+
+        .credential-note strong {
+            color: var(--text);
+        }
+
+        .login-logo {
+            height: 2rem;
+            width: auto;
+            margin-bottom: 1rem;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-box">
+        <img src="/static/logo.png" alt="Zenseact" class="login-logo">
+        <h1>Work Wrapped</h1>
+        <p class="subtitle">Sign in to see your activity</p>
+        <p class="credential-note">
+            <strong>Gerrit:</strong> username + HTTP password from Gerrit.<br>
+            <strong>Jira / Confluence:</strong> email address + password (or API token).
+        </p>
+        {% if error %}
+        <p class="error">{{ error }}</p>
+        {% endif %}
+        <form method="post" action="{{ url_for('login') }}">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Gerrit (required)</p>
+            <div class="form-group">
+                <label for="email">Gerrit username (s-number)</label>
+                <input type="text" id="email" name="email" placeholder="your username" required autofocus
+                    value="{{ request.form.email if request.form else '' }}">
+                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                    Your Gerrit login is your <strong>username</strong>, not your email.
+                </small>
+            </div>
+            <div class="form-group">
+                <label for="password">Gerrit HTTP password</label>
+                <input type="password" id="password" name="password" placeholder="••••••••" required>
+                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                    This is <strong>not</strong> your normal Gerrit login password. Get it in Gerrit: click your profile
+                    (top right) → <strong>Settings</strong> → <strong>HTTP Password</strong> → <strong>Generate
+                        password</strong>. Copy the generated password and paste it here.
+                </small>
+            </div>
+            {% if jira_configured %}
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 1rem 0 0.5rem;">Optional: Jira (email +
+                password)</p>
+            <div class="form-group">
+                <label for="jira_email">Jira email address</label>
+                <input type="text" id="jira_email" name="jira_email" placeholder="you@company.com"
+                    value="{{ request.form.jira_email if request.form else '' }}">
+                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                    Use your Jira <strong>email address</strong>.
+                </small>
+            </div>
+            <div class="form-group">
+                <label for="jira_api_token">Jira password</label>
+                <input type="password" id="jira_api_token" name="jira_api_token" placeholder="Leave blank to skip Jira">
+                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                    Your Jira password. For Jira Cloud you can use an <a
+                        href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank"
+                        rel="noopener" style="color: var(--accent);">API token</a> instead.
+                </small>
+            </div>
+            {% endif %}
+            {% if confluence_configured %}
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 1rem 0 0.5rem;">Optional: Confluence (email
+                + password)</p>
+            <div class="form-group">
+                <label for="confluence_email">Confluence email address</label>
+                <input type="text" id="confluence_email" name="confluence_email"
+                    placeholder="Leave blank to use Jira credentials"
+                    value="{{ request.form.confluence_email if request.form else '' }}">
+                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                    Use your Confluence <strong>email address</strong>. Leave blank to reuse Jira email if same
+                    Atlassian account.
+                </small>
+            </div>
+            <div class="form-group">
+                <label for="confluence_api_token">Confluence password</label>
+                <input type="password" id="confluence_api_token" name="confluence_api_token"
+                    placeholder="Leave blank to use Jira password">
+                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                    Your Confluence password (or API token for Cloud). Same as Jira if same Atlassian site.
+                </small>
+            </div>
+            {% endif %}
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 1rem 0 0.5rem;">Optional: Slack (OAuth
+                token)</p>
+            <div class="form-group">
+                <label for="slack_token">Slack User OAuth Token</label>
+                <input type="password" id="slack_token" name="slack_token" placeholder="xoxp-... (leave blank to skip)">
+                <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                    Create an app at <a href="https://api.slack.com/apps" target="_blank" rel="noopener"
+                        style="color: var(--accent);">api.slack.com/apps</a>, install to your workspace, and paste the
+                    <strong>User OAuth Token</strong> (xoxp-...). Scopes: channels:read, channels:history, groups:read,
+                    groups:history.
+                </small>
+            </div>
+            <button type="submit">Sign in</button>
+        </form>
+        {% if not gerrit_configured %}
+        <p class="demo-hint">
+            Set <code>GERRIT_URL</code> to your Gerrit server (e.g. https://gerrit.company.com)
+        </p>
+        {% else %}
+        <p class="demo-hint">
+            <strong>Gerrit:</strong> Username = your username. Password = HTTP Password from Gerrit →
+            Settings → HTTP Password → Generate password (not your normal login password).
+        </p>
+        {% endif %}
+    </div>
+</body>
+
+</html>

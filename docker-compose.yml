@@ -1,0 +1,18 @@
+# Work Wrapped – run with: docker compose up --build
+# Uses .env from project root for GERRIT_URL, JIRA_URL, SECRET_KEY, etc.
+# Image is tagged with version from ./VERSION (e.g. work-wrapped:1.0.0 and work-wrapped:latest).
+services:
+  app:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-1.0.0}
+    image: work-wrapped:${VERSION:-latest}
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    # Optional: mount .env so you can edit without rebuild (env_file takes precedence at build of container)
+    # volumes:
+    #   - ./.env:/app/.env:ro
+    restart: unless-stopped
