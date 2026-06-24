@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}Connections - Work Wrapped{% endblock %}
+
+{% block content %}
+<section>
+    <h2 class="page-title">Connections</h2>
+    <p class="page-subtitle">Link each service to pull your activity into Work Wrapped. Connections last for this
+        session &mdash; reconnect after you sign in again.</p>
+
+    <!-- Gerrit -->
+    <div class="card conn-card" id="card-gerrit"
+        data-connected="{{ 'true' if connections.gerrit.connected else 'false' }}">
+        <div class="conn-head">
+            <div class="conn-title"><span class="conn-dot" style="background: var(--gerrit, #f97316);"></span> Gerrit
+            </div>
+            <span class="conn-status {{ 'on' if connections.gerrit.connected else 'off' }}">
+                {{ ('Connected · ' ~ connections.gerrit.identifier) if connections.gerrit.connected else 'Not connected'
+                }}
+            </span>
+        </div>
+        {% if not connections.gerrit.configured %}
+        <p class="field-hint">Gerrit is not configured on the server (set <code>GERRIT_URL</code>).</p>
+        {% else %}
+        <div class="conn-body">
+            <div class="form-row">
+                <label>Username</label>
+                <input type="text" data-field="username" placeholder="your gerrit username">
+            </div>
+            <div class="form-row">
+                <label>HTTP password</label>
+                <input type="password" data-field="password" placeholder="Gerrit → Settings → HTTP Password">
+            </div>
+            <div class="conn-actions">
+                <button class="btn btn-primary btn-sm" onclick="connect('gerrit')">Connect</button>
+                <button class="btn btn-ghost btn-sm" onclick="disconnect('gerrit')">Disconnect</button>
+                <span class="conn-msg"></span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Jira -->
+    <div class="card conn-card" id="card-jira" data-connected="{{ 'true' if connections.jira.connected else 'false' }}">
+        <div class="conn-head">
+            <div class="conn-title"><span class="conn-dot" style="background: var(--jira, #2684ff);"></span> Jira</div>
+            <span class="conn-status {{ 'on' if connections.jira.connected else 'off' }}">
+                {{ ('Connected · ' ~ connections.jira.identifier) if connections.jira.connected else 'Not connected' }}
+            </span>
+        </div>
+        {% if not connections.jira.configured %}
+        <p class="field-hint">Jira is not configured on the server (set <code>JIRA_URL</code>).</p>
+        {% else %}
+        <div class="conn-body">
+            <div class="form-row">
+                <label>Email</label>
+                <input type="email" data-field="email" placeholder="you@company.com">
+            </div>
+            <div class="form-row">
+                <label>Password / API token</label>
+                <input type="password" data-field="api_token" placeholder="password or API token">
+            </div>
+            <div class="conn-actions">
+                <button class="btn btn-primary btn-sm" onclick="connect('jira')">Connect</button>
+                <button class="btn btn-ghost btn-sm" onclick="disconnect('jira')">Disconnect</button>
+                <span class="conn-msg"></span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Confluence -->
+    <div class="card conn-card" id="card-confluence"
+        data-connected="{{ 'true' if connections.confluence.connected else 'false' }}">
+        <div class="conn-head">
+            <div class="conn-title"><span class="conn-dot" style="background: var(--confluence, #0052cc);"></span>
+                Confluence</div>
+            <span class="conn-status {{ 'on' if connections.confluence.connected else 'off' }}">
+                {{ ('Connected · ' ~ connections.confluence.identifier) if connections.confluence.connected else 'Not
+                connected' }}
+            </span>
+        </div>
+        {% if not connections.confluence.configured %}
+        <p class="field-hint">Confluence is not configured on the server (set <code>CONFLUENCE_URL</code>).</p>
+        {% else %}
+        <div class="conn-body">
+            <div class="form-row">
+                <label>Email</label>
+                <input type="email" data-field="email" placeholder="you@company.com">
+            </div>
+            <div class="form-row">
+                <label>Password / API token</label>
+                <input type="password" data-field="api_token" placeholder="password or API token">
+            </div>
+            <div class="conn-actions">
+                <button class="btn btn-primary btn-sm" onclick="connect('confluence')">Connect</button>
+                <button class="btn btn-ghost btn-sm" onclick="disconnect('confluence')">Disconnect</button>
+                <span class="conn-msg"></span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Slack -->
+    <div class="card conn-card" id="card-slack"
+        data-connected="{{ 'true' if connections.slack.connected else 'false' }}">
+        <div class="conn-head">
+            <div class="conn-title"><span class="conn-dot" style="background: var(--slack, #e01e5a);"></span> Slack
+            </div>
+            <span class="conn-status {{ 'on' if connections.slack.connected else 'off' }}">
+                {{ ('Connected · ' ~ connections.slack.identifier) if connections.slack.connected and
+                connections.slack.identifier else ('Connected' if connections.slack.connected else 'Not connected') }}
+            </span>
+        </div>
+        <div class="conn-body">
+            <div class="form-row">
+                <label>User OAuth Token</label>
+                <input type="password" data-field="token" placeholder="xoxp-...">
+                <p class="field-hint">Create an app at api.slack.com/apps, install it, and paste the User OAuth Token.
+                    Scopes: channels:read, channels:history, groups:read, groups:history.</p>
+            </div>
+            <div class="conn-actions">
+                <button class="btn btn-primary btn-sm" onclick="connect('slack')">Connect</button>
+                <button class="btn btn-ghost btn-sm" onclick="disconnect('slack')">Disconnect</button>
+                <span class="conn-msg"></span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block head %}
+<style>
+    .conn-card {
+        max-width: 640px;
+    }
+
+    .conn-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .conn-title {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        font-weight: 600;
+        font-size: 1.05rem;
+    }
+
+    .conn-dot {
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .conn-status {
+        font-size: 0.82rem;
+        font-weight: 500;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+    }
+
+    .conn-status.on {
+        color: #2ecc71;
+        background: rgba(46, 204, 113, 0.12);
+    }
+
+    .conn-status.off {
+        color: var(--text-faint);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .form-row {
+        margin-bottom: 0.9rem;
+    }
+
+    .form-row label {
+        display: block;
+        margin-bottom: 0.35rem;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    .form-row input {
+        width: 100%;
+        max-width: 360px;
+    }
+
+    .field-hint {
+        font-size: 0.8rem;
+        color: var(--text-faint);
+        margin-top: 0.35rem;
+        line-height: 1.4;
+    }
+
+    .conn-actions {
+        display: flex;
+        gap: 0.6rem;
+        align-items: center;
+        margin-top: 0.5rem;
+    }
+
+    .conn-msg {
+        font-size: 0.82rem;
+    }
+
+    .conn-msg.err {
+        color: var(--error, #f85149);
+    }
+
+    .conn-msg.ok {
+        color: #2ecc71;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const FIELDS = {
+        gerrit: ['username', 'password'],
+        jira: ['email', 'api_token'],
+        confluence: ['email', 'api_token'],
+        slack: ['token'],
+    };
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    function setStatus(service, connected, identifier) {
+        const card = document.getElementById('card-' + service);
+        const status = card.querySelector('.conn-status');
+        card.dataset.connected = connected ? 'true' : 'false';
+        status.classList.toggle('on', connected);
+        status.classList.toggle('off', !connected);
+        if (connected) {
+            status.textContent = identifier ? ('Connected · ' + identifier) : 'Connected';
+        } else {
+            status.textContent = 'Not connected';
+        }
+    }
+
+    function msg(service, text, kind) {
+        const el = document.querySelector('#card-' + service + ' .conn-msg');
+        if (!el) return;
+        el.textContent = text || '';
+        el.className = 'conn-msg' + (kind ? ' ' + kind : '');
+    }
+
+    async function connect(service) {
+        const card = document.getElementById('card-' + service);
+        const payload = {};
+        let missing = false;
+        FIELDS[service].forEach(f => {
+            const input = card.querySelector('[data-field="' + f + '"]');
+            payload[f] = input ? input.value : '';
+            if (!payload[f]) missing = true;
+        });
+        if (missing) { msg(service, 'Please fill in all fields.', 'err'); return; }
+        const btn = card.querySelector('.btn-primary');
+        btn.disabled = true;
+        msg(service, 'Connecting…', '');
+        try {
+            const res = await fetch('/api/connect/' + service, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                setStatus(service, true, data.identifier);
+                msg(service, '', '');
+                showToast(service.charAt(0).toUpperCase() + service.slice(1) + ' connected');
+                FIELDS[service].forEach(f => {
+                    const input = card.querySelector('[data-field="' + f + '"]');
+                    if (input && input.type === 'password') input.value = '';
+                });
+            } else {
+                msg(service, data.error || 'Could not connect.', 'err');
+            }
+        } catch (e) {
+            msg(service, 'Could not connect.', 'err');
+        }
+        btn.disabled = false;
+    }
+
+    async function disconnect(service) {
+        try {
+            const res = await fetch('/api/disconnect/' + service, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                setStatus(service, false);
+                msg(service, '', '');
+                showToast('Disconnected');
+            }
+        } catch (e) { /* ignore */ }
+    }
+</script>
+{% endblock %}

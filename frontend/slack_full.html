@@ -1,22 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Slack messages – Work Wrapped{% endblock %}
 {% block content %}
-<p style="margin-bottom: 1rem;"><a href="/?months={{ months or 12 }}" style="color: var(--accent);">← Back to
-        dashboard</a></p>
-<div class="time-filter-wrap"
-    style="display:flex; align-items:center; gap:0.75rem; margin-bottom: 1rem; flex-wrap:wrap;">
-    <label for="time-range-select" style="color: var(--text-muted); font-size: 0.9rem;">Time range</label>
-    <select id="time-range-select" onchange="location.href='{{ time_filter_path or '/slack' }}?months=' + this.value"
-        style="background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem;">
+<a href="/?months={{ months or 12 }}" class="back-link">← Back to dashboard</a>
+<div class="time-filter-wrap">
+    <label for="time-range-select">Time range</label>
+    <select id="time-range-select" onchange="location.href='{{ time_filter_path or '/slack' }}?months=' + this.value">
         {% for m, label in time_range_options or [(12, 'Last 12 months')] %}
         <option value="{{ m }}" {% if (months or 12)==m %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
     </select>
-    <span style="color: var(--text-muted); font-size: 0.85rem;">{{ time_range_label or 'Last 12 months' }}</span>
+    <span style="color: var(--text-muted); font-size: 0.9rem;">{{ time_range_label or 'Last 12 months' }}</span>
 </div>
-<h2 style="margin-bottom: 0.5rem;">Slack – your messages</h2>
-<p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Messages you sent {{ time_range_label or
-    'in the last 12 months' }} (public and private channels)</p>
+<h2 class="page-title">Slack</h2>
+<p class="page-subtitle">Messages you sent {{ time_range_label or 'in the last 12 months' }} (public and private channels)</p>
 
 {% if slack_error %}
 <div class="card">
@@ -49,7 +45,10 @@
     <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">When & how you message</h3>
     <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
         {% if slack_connected and (slack_metrics.peak_hour is not none or slack_metrics.peak_weekday is not none or
-        slack_metrics.thread_reply_count is not none or slack_metrics.total_reactions is not none) %}
+        slack_metrics.peak_weekday_hour_one_liner or slack_metrics.thread_reply_count is not none or
+        slack_metrics.total_reactions is not none) %}
+        {% if slack_metrics.peak_weekday_hour_one_liner %}<strong>{{ slack_metrics.peak_weekday_hour_one_liner
+            }}</strong>. {% endif %}
         {% if slack_metrics.peak_hour is not none %}Peak hour: <strong>{{ slack_metrics.peak_hour }}:00</strong>. {%
         endif %}
         {% if slack_metrics.peak_weekday is not none and slack_metrics.weekday_names %}Peak day: <strong>{{
@@ -66,6 +65,24 @@
         {% endif %}
     </p>
 </div>
+
+{% if slack_connected and slack_metrics.longest_threads and slack_metrics.longest_threads|length > 0 %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Longest threads you started</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Top-level messages with the most
+        replies (top 10).</p>
+    <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.9rem;">
+        {% for t in slack_metrics.longest_threads %}
+        <li style="margin-bottom: 0.35rem;">
+            <strong>{{ t.channel_name }}</strong> · {{ t.reply_count }} repl{{ 'y' if t.reply_count == 1 else 'ies' }}{%
+            if t.text %} · {{ t.text }}{% if (t.text or '')|length >= 80 %}…{% endif %}{% endif %}
+            {% if t.link %}<a href="{{ t.link }}" target="_blank" rel="noopener"
+                style="color: var(--accent); font-size: 0.85rem;">Open thread</a>{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
 
 <div class="card" style="margin-bottom: 1.5rem;">
     <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Messages by channel — most active</h3>

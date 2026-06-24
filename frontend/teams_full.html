@@ -1,22 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Teams – Work Wrapped{% endblock %}
 {% block content %}
-<p style="margin-bottom: 1rem;"><a href="/?months={{ months or 12 }}" style="color: var(--accent);">← Back to
-        dashboard</a></p>
-<div class="time-filter-wrap"
-    style="display:flex; align-items:center; gap:0.75rem; margin-bottom: 1rem; flex-wrap:wrap;">
-    <label for="time-range-select" style="color: var(--text-muted); font-size: 0.9rem;">Time range</label>
-    <select id="time-range-select" onchange="location.href='{{ time_filter_path or '/teams' }}?months=' + this.value"
-        style="background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem;">
+<a href="/?months={{ months or 12 }}" class="back-link">← Back to dashboard</a>
+<div class="time-filter-wrap">
+    <label for="time-range-select">Time range</label>
+    <select id="time-range-select" onchange="location.href='{{ time_filter_path or '/teams' }}?months=' + this.value">
         {% for m, label in time_range_options or [(12, 'Last 12 months')] %}
         <option value="{{ m }}" {% if (months or 12)==m %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
     </select>
-    <span style="color: var(--text-muted); font-size: 0.85rem;">{{ time_range_label or 'Last 12 months' }}</span>
+    <span style="color: var(--text-muted); font-size: 0.9rem;">{{ time_range_label or 'Last 12 months' }}</span>
 </div>
-<h2 style="margin-bottom: 0.5rem;">Microsoft Teams – chats & meetings</h2>
-<p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Your Teams messages and meeting activity
-    {{ time_range_label or 'in the last 12 months' }}</p>
+<h2 class="page-title">Microsoft Teams</h2>
+<p class="page-subtitle">Your Teams messages and meeting activity {{ time_range_label or 'in the last 12 months' }}</p>
 
 <div class="card">
     <p style="color: var(--text-muted);">Connect Microsoft Teams at login (Microsoft 365) to see your chats and meeting

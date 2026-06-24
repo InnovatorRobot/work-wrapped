@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Team - Work Wrapped{% endblock %}
+
+{% block content %}
+<section>
+    <div class="mtg-head"
+        style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+        <div>
+            <h2 class="page-title">Team view</h2>
+            <p class="page-subtitle">Aggregated activity across everyone who opted in — totals and themes only, no
+                individual names.</p>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+            <a class="btn btn-secondary btn-sm" href="/api/team/export/csv">Export CSV</a>
+            <a class="btn btn-secondary btn-sm" href="/team/export/pdf">Export PDF</a>
+        </div>
+    </div>
+
+    {% if not opted_in %}
+    <div class="card" style="margin-bottom:1rem; border-color: var(--accent-ring);">
+        <p style="margin:0; font-size:0.9rem;">You're not contributing to the team aggregate yet.
+            <a href="{{ url_for('settings_page') }}" style="color:var(--accent);">Enable team sharing in Settings</a>
+            to be counted (only your totals &amp; themes, never your name).
+        </p>
+    </div>
+    {% endif %}
+
+    <div class="card" style="margin-bottom:1rem;">
+        <div class="section-label">Participants</div>
+        <p style="font-size:1.4rem; font-weight:700; margin:0;">{{ team.participant_count }}</p>
+        {% if team.updated_at %}<p class="field-hint" style="margin:0.2rem 0 0;">Last updated {{ team.updated_at }}</p>
+        {% endif %}
+    </div>
+
+    <div class="grid" style="margin-bottom:1rem;">
+        <div class="card"><span class="badge badge-jira">Jira</span> {{ team.totals.jira }} tickets
+            <span class="field-hint">(avg {{ team.average.jira }})</span>
+        </div>
+        <div class="card"><span class="badge badge-gerrit">Gerrit</span> {{ team.totals.gerrit }} changes
+            <span class="field-hint">(avg {{ team.average.gerrit }})</span>
+        </div>
+        <div class="card"><span class="badge badge-confluence">Confluence</span> {{ team.totals.confluence }} pages
+            <span class="field-hint">(avg {{ team.average.confluence }})</span>
+        </div>
+        <div class="card"><span class="badge badge-slack">Slack</span> {{ team.totals.slack }} messages
+            <span class="field-hint">(avg {{ team.average.slack }})</span>
+        </div>
+    </div>
+
+    {% if team.themes %}
+    <h3 class="chart-section-title">Top team areas</h3>
+    <div class="card" style="margin-bottom:1rem;">
+        <ul style="margin:0; padding-left:1.25rem; font-size:0.9rem; columns:2;">
+            {% for th in team.themes %}
+            <li>{{ th.name }} <span class="field-hint">({{ th.count }})</span></li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if team.highlights %}
+    <div class="card nudge-card">
+        <ul style="margin:0; padding-left:1.25rem; font-size:0.9rem; color:var(--text-muted);">
+            {% for h in team.highlights %}<li>{{ h }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

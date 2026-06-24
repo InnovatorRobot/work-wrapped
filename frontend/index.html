@@ -1,36 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Work Wrapped - Personal & Team Dashboard{% endblock %}
+{% block title %}Overview - Work Wrapped{% endblock %}
+{% block topbar_title %}Overview{% endblock %}
 
 {% block content %}
-<section id="personal">
-    <h2 style="margin-bottom: 1rem; font-size: 1.2rem;">Personal View</h2>
-    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
-        What did I actually work on this year?
-    </p>
-    <div class="card ai-opportunity-card" style="margin-bottom: 1.5rem;">
-        <h3 style="font-size: 0.95rem; margin-bottom: 0.35rem;">✨ AI summaries & categorization</h3>
-        <p class="ai-opportunity-desc" style="margin-bottom: 0.5rem;">On each page you can get a brief AI-generated
-            summary and themes from your data: Gerrit changes, Jira tickets, Confluence pages (and optionally Slack).
-            Connect an LLM to enable.</p>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0;">
-            <a href="/gerrit" style="color: var(--accent);">Gerrit</a> ·
-            <a href="/jira" style="color: var(--accent);">Jira</a> ·
-            <a href="/confluence" style="color: var(--accent);">Confluence</a> ·
-            <a href="/slack" style="color: var(--accent);">Slack</a>
-        </p>
-    </div>
-    <div id="personal-content">
-        <p style="color: var(--text-muted);">Loading your activity...</p>
-    </div>
-</section>
-
-<section id="team" style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.08);">
-    <h2 style="margin-bottom: 1rem; font-size: 1.2rem;">Team View</h2>
-    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
-        What themes and impact does the team have? Aggregated view — not for comparing individuals.
-    </p>
-    <div class="card" id="team-content">
-        <p style="color: var(--text-muted);">Loading team summary...</p>
+<section>
+    <div id="overview-content">
+        <p style="color: var(--text-muted);">Loading your activity…</p>
     </div>
 </section>
 {% endblock %}
@@ -44,8 +19,7 @@
         try {
             const d = new Date(iso);
             if (isNaN(d.getTime())) return iso;
-            const now = new Date();
-            const min = Math.floor((now - d) / 60000);
+            const min = Math.floor((new Date() - d) / 60000);
             if (min < 1) return 'just now';
             if (min < 60) return min + ' min ago';
             const h = Math.floor(min / 60);
@@ -54,429 +28,81 @@
         } catch (e) { return iso; }
     }
 
-    async function loadPersonal(monthsParam, refresh) {
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    async function loadOverview(monthsParam, refresh) {
         let url = monthsParam != null ? '/api/personal?months=' + monthsParam : '/api/personal';
         if (refresh) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'refresh=1';
         const res = await fetch(url);
-        if (res.status === 401) {
-            window.location.href = '/login';
-            return;
-        }
+        if (res.status === 401) { window.location.href = '/login'; return; }
         let data;
-        try {
-            data = await res.json();
-        } catch (e) {
-            document.getElementById('personal-content').innerHTML = '<p style="color: var(--error, #f85149);">Could not load data. Try <a href="javascript:loadPersonal(currentMonths, true)">refreshing</a>.</p>';
+        try { data = await res.json(); }
+        catch (e) {
+            document.getElementById('overview-content').innerHTML = '<p style="color: var(--error);">Could not load data. <a href="javascript:loadOverview(currentMonths, true)">Retry</a>.</p>';
             return;
         }
         if (data.months != null) currentMonths = data.months;
-        try {
-            renderPersonal(data);
-        } catch (e) {
-            console.error('renderPersonal error', e);
-            document.getElementById('personal-content').innerHTML = '<p style="color: var(--error, #f85149);">Something went wrong displaying your data. Try <a href="javascript:location.reload()">reloading the page</a>.</p>';
-        }
+        renderOverview(data);
     }
 
-    function changeTimeRange(months) {
-        loadPersonal(parseInt(months, 10));
-    }
+    function changeTimeRange(months) { loadOverview(parseInt(months, 10)); }
 
-    async function saveGoals() {
-        const payload = {
-            tickets_done: document.getElementById('goal-tickets') && document.getElementById('goal-tickets').value ? parseInt(document.getElementById('goal-tickets').value, 10) : null,
-            reviews: document.getElementById('goal-reviews') && document.getElementById('goal-reviews').value ? parseInt(document.getElementById('goal-reviews').value, 10) : null,
-            messages: document.getElementById('goal-messages') && document.getElementById('goal-messages').value ? parseInt(document.getElementById('goal-messages').value, 10) : null,
-        };
-        await fetch('/api/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        loadPersonal(currentMonths);
-    }
+    function renderOverview(data) {
+        const t = data.totals || {};
+        const user = data.user || {};
+        const options = data.time_range_options || [[12, 'Last 12 months']];
+        const selectOpts = options.map(([m, label]) => `<option value="${m}" ${(data.months || 12) === m ? 'selected' : ''}>${esc(label)}</option>`).join('');
+        const bm = data.busiest_month_cross, bw = data.busiest_week;
+        const nudges = data.nudges || [];
 
-    async function setTeamOptin(include) {
-        await fetch('/api/team-comparison', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ include: !!include }) });
-        loadPersonal(currentMonths);
-    }
+        const strip = (bm || bw || data.focus_score_pct != null || data.trend_label)
+            ? `<div class="card" style="margin-bottom:1.25rem;"><p style="margin:0; font-size:0.92rem;">${bm ? 'Busiest month: <strong>' + esc(bm.label || bm.month) + '</strong> (' + bm.count + '). ' : ''}${bw ? 'Busiest week: <strong>' + esc(bw.label) + '</strong> (' + bw.count + '). ' : ''}${data.focus_score_pct != null ? 'Focus: <strong>' + data.focus_score_pct + '%</strong> in top 2 areas. ' : ''}${data.trend_label ? 'Trend: <strong>' + esc(data.trend_label) + '</strong>.' : ''}</p></div>`
+            : '';
 
-    async function saveSnapshot() {
-        const input = document.getElementById('snapshot-label');
-        const label = (input && input.value && input.value.trim()) ? input.value.trim() : 'Snapshot';
-        const res = await fetch('/api/snapshots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label }) });
-        if (res.ok) {
-            if (input) input.value = '';
-            loadPersonal(currentMonths);
-        }
-    }
+        const navCards = [
+            ['/insights', '✦ Insights', 'AI summary, ask your data & trends'],
+            ['/goals', '◎ Goals', 'Objectives, targets & snapshots'],
+            ['/meetings', '☷ 1:1s', 'Agendas, notes & action items'],
+            ['/gerrit', '◆ Gerrit', (t.gerrit || 0) + ' changes'],
+            ['/jira', '◆ Jira', (t.jira || 0) + ' tickets'],
+            ['/confluence', '◆ Confluence', (t.confluence || 0) + ' pages'],
+            ['/slack', '◆ Slack', (t.slack || 0) + ' messages'],
+            ['/team', '⚇ Team', 'Aggregated team view'],
+        ];
 
-    async function createShareLink() {
-        const btn = document.getElementById('share-link-btn');
-        const result = document.getElementById('share-link-result');
-        const input = document.getElementById('share-link-url');
-        if (btn) btn.disabled = true;
-        try {
-            const res = await fetch('/api/share', { method: 'POST' });
-            const data = await res.json();
-            if (data.url && input) {
-                input.value = data.url;
-                if (result) result.style.display = 'block';
-            }
-        } catch (e) { /* ignore */ }
-        if (btn) btn.disabled = false;
-    }
-
-    function copyShareLink() {
-        const input = document.getElementById('share-link-url');
-        if (input && input.value) {
-            navigator.clipboard.writeText(input.value).then(function () {
-                const btn = input.nextElementSibling;
-                if (btn) { btn.textContent = 'Copied!'; setTimeout(function () { btn.textContent = 'Copy'; }, 2000); }
-            });
-        }
-    }
-
-    function renderPersonal(data) {
-        const { user = {}, totals = {}, themes = [], jira = [], gerrit = [], confluence = [], slack = [], gerrit_error, jira_error, confluence_error, slack_error, jira_connected, confluence_connected, slack_connected, gerrit_metrics = {}, jira_metrics = {}, confluence_metrics = {}, slack_metrics = {}, months, time_range_label, time_range_options, period_comparison, month_over_month, goals = {}, goals_progress = {}, team_optin, team_comparison, snapshots = [], highlights = [], nudges = [] } = data;
-        const options = time_range_options || [[12, 'Last 12 months']];
-        let selectOpts = options.map(([m, label]) => `<option value="${m}" ${(months || 12) === m ? 'selected' : ''}>${label}</option>`).join('');
         let html = `
-            <div class="time-filter-wrap" style="display:flex; align-items:center; gap:0.75rem; margin-bottom: 1rem; flex-wrap:wrap;">
-                <label for="time-range-select" style="color: var(--text-muted); font-size: 0.9rem;">Time range</label>
-                <select id="time-range-select" onchange="changeTimeRange(this.value)" style="background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem;">
-                    ${selectOpts}
-                </select>
-                <span style="color: var(--text-muted); font-size: 0.85rem;">${time_range_label || 'Last 12 months'}</span>
-            </div>
-            <h2 style="margin-bottom: 0.5rem;">${user.name}</h2>
-            <p style="color: var(--text-muted); margin-bottom: 0.5rem;">${user.team || 'Your work across Jira & Gerrit'}</p>
-            <p style="font-size: 0.85rem; margin-bottom: 1.5rem;"><span style="color: var(--text-muted);">Download:</span> <a href="/export/pdf?months=${data.months || 12}" style="color: var(--accent);">PDF</a> · <a href="/export/onepager?months=${data.months || 12}" style="color: var(--accent);">One-pager PDF</a> · <a href="/api/export/json?months=${data.months || 12}" style="color: var(--accent);" download="work-wrapped.json">JSON</a> · <a href="/api/export/csv?months=${data.months || 12}" style="color: var(--accent);" download="work-wrapped.csv">CSV</a> · <span style="color: var(--text-muted);">Data as of <span id="data-fetched-at">${formatFetchedAt(data.fetched_at)}</span></span> · <a href="javascript:loadPersonal(currentMonths, true)" style="color: var(--accent);">Refresh data</a></p>
-            <div class="card" style="margin-bottom: 1rem;" id="share-link-card">
-                <p style="font-size: 0.9rem; margin-bottom: 0.5rem;"><strong>Share with your manager</strong></p>
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Create a read-only link to this summary (no login required). Link expires in 30 days.</p>
-                <button type="button" id="share-link-btn" onclick="createShareLink()" style="background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 0.4rem 0.75rem; font-size: 0.9rem; cursor: pointer;">Create shareable link</button>
-                <div id="share-link-result" style="display: none; margin-top: 0.75rem;">
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Link created. Copy and share:</p>
-                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="share-link-url" readonly style="flex: 1; min-width: 12rem; background: var(--bg); border: 1px solid rgba(255,255,255,0.2); color: var(--text); padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.85rem;">
-                        <button type="button" onclick="copyShareLink()" style="background: rgba(255,255,255,0.1); color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 0.35rem 0.6rem; font-size: 0.85rem; cursor: pointer;">Copy</button>
-                    </div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+                <div>
+                    <h1 class="hero-greeting">Hi, ${esc(user.name || 'there')} 👋</h1>
+                    <p style="color:var(--text-muted); margin:0;">Here's your work at a glance — for reflection, not ranking.</p>
+                </div>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <label for="time-range-select" style="color:var(--text-muted); font-size:0.85rem;">Range</label>
+                    <select id="time-range-select" onchange="changeTimeRange(this.value)">${selectOpts}</select>
                 </div>
             </div>
-            ${(nudges && nudges.length) ? `<div class="card" style="margin-bottom: 1rem; border-left: 3px solid var(--accent);"><h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Reminders</h3><ul style="margin: 0; padding-left: 1.25rem; font-size: 0.9rem; color: var(--text-muted);">${nudges.map(n => '<li>' + (n.message || n) + '</li>').join('')}</ul></div>` : ''}
-            ${(highlights && highlights.length) ? `<h3 class="chart-section-title">Talking points</h3><div class="card" style="margin-bottom: 1rem;"><p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">For 1:1 or self-review:</p><ul style="margin: 0; padding-left: 1.25rem; font-size: 0.9rem;">${highlights.map(h => '<li>' + h + '</li>').join('')}</ul></div>` : ''}
-            <div class="grid" style="margin-bottom: 1.5rem;">
-                <div class="card"><span class="badge badge-jira">Jira</span> ${totals.jira} tickets</div>
-                <div class="card"><span class="badge badge-gerrit">Gerrit</span> ${totals.gerrit} changes</div>
-                <div class="card"><span class="badge badge-confluence">Confluence</span> ${totals.confluence} pages</div>
-                <div class="card"><span class="badge badge-slack">Slack</span> ${totals.slack} messages</div>
+
+            <div class="stat-grid" style="margin-bottom:1.25rem;">
+                <div class="card stat-card"><div class="stat-num">${t.jira || 0}</div><div class="stat-label"><span class="badge badge-jira">Jira</span> tickets</div></div>
+                <div class="card stat-card"><div class="stat-num">${t.gerrit || 0}</div><div class="stat-label"><span class="badge badge-gerrit">Gerrit</span> changes</div></div>
+                <div class="card stat-card"><div class="stat-num">${t.confluence || 0}</div><div class="stat-label"><span class="badge badge-confluence">Confluence</span> pages</div></div>
+                <div class="card stat-card"><div class="stat-num">${t.slack || 0}</div><div class="stat-label"><span class="badge badge-slack">Slack</span> messages</div></div>
             </div>
-            ${!slack_connected ? '<p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Add a Slack User OAuth Token at login to see your messages.</p>' : ''}
+
+            ${strip}
+
+            ${nudges.length ? `<div class="card nudge-card" style="margin-bottom:1.25rem;"><h3 style="font-size:0.95rem; margin:0 0 0.5rem;">Reminders</h3><ul style="margin:0; padding-left:1.25rem; font-size:0.9rem; color:var(--text-muted);">${nudges.map(n => '<li>' + esc(n.message || n) + '</li>').join('')}</ul></div>` : ''}
+
+            <h3 class="chart-section-title">Explore</h3>
+            <div class="nav-card-grid" style="margin-bottom:1.5rem;">
+                ${navCards.map(([href, title, desc]) => `<a class="card nav-card" href="${href}"><div class="nav-card-title">${esc(title)}</div><div class="nav-card-desc">${esc(desc)}</div></a>`).join('')}
+            </div>
+
+            <p style="font-size:0.83rem; color:var(--text-muted);">Data as of <span>${formatFetchedAt(data.fetched_at)}</span> · <a href="javascript:loadOverview(currentMonths, true)" style="color:var(--accent);">Refresh</a></p>
         `;
-
-        // Period vs period (last 6 vs previous 6 months)
-        if (period_comparison) {
-            const c = period_comparison.current_6m;
-            const p = period_comparison.previous_6m;
-            const trend = (cur, prev) => prev === 0 ? (cur > 0 ? '+' : '') : ((cur - prev) / prev * 100).toFixed(0);
-            html += `<h3 class="chart-section-title">Last 6 months vs previous 6 months</h3><div class="card" style="margin-bottom: 1rem;">`;
-            html += `<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Tickets: <strong>${c.jira}</strong> vs ${p.jira} (${trend(c.jira, p.jira)}%). Changes: <strong>${c.gerrit}</strong> vs ${p.gerrit} (${trend(c.gerrit, p.gerrit)}%). Messages: <strong>${c.slack}</strong> vs ${p.slack} (${trend(c.slack, p.slack)}%).</p>`;
-            html += `</div>`;
-        }
-        // Month-over-month (last month vs previous month)
-        if (month_over_month) {
-            const last = month_over_month.last;
-            const prev = month_over_month.previous;
-            const trend = (cur, p) => p === 0 ? (cur > 0 ? '+' : '') : ((cur - p) / p * 100).toFixed(0);
-            html += `<h3 class="chart-section-title">Vs last month</h3><div class="card" style="margin-bottom: 1rem;">`;
-            html += `<p style="font-size: 0.9rem; margin-bottom: 0;">${month_over_month.last_month}: Tickets ${last.jira} (${trend(last.jira, prev.jira)}%), Changes ${last.gerrit} (${trend(last.gerrit, prev.gerrit)}%), Messages ${last.slack} (${trend(last.slack, prev.slack)}%) vs ${month_over_month.previous_month}.</p>`;
-            html += `</div>`;
-        }
-
-        // Goals and progress
-        html += `<h3 class="chart-section-title">Goals (optional)</h3><div class="card" style="margin-bottom: 1rem;">`;
-        html += `<p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Set targets to track progress. Progress is shown below when goals are set.</p>`;
-        html += `<div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; margin-bottom: 0.75rem;"><label>Tickets done <input type="number" id="goal-tickets" min="0" placeholder="e.g. 24" value="${goals && goals.tickets_done != null ? goals.tickets_done : ''}" style="width:4rem; margin-left:0.25rem; background: var(--bg); color: var(--text); border: 1px solid rgba(255,255,255,0.2); border-radius:4px; padding:0.25rem;"></label>`;
-        html += `<label>Reviews (changes) <input type="number" id="goal-reviews" min="0" placeholder="e.g. 50" value="${goals && goals.reviews != null ? goals.reviews : ''}" style="width:4rem; margin-left:0.25rem; background: var(--bg); color: var(--text); border: 1px solid rgba(255,255,255,0.2); border-radius:4px; padding:0.25rem;"></label>`;
-        html += `<label>Messages <input type="number" id="goal-messages" min="0" placeholder="e.g. 500" value="${goals && goals.messages != null ? goals.messages : ''}" style="width:4rem; margin-left:0.25rem; background: var(--bg); color: var(--text); border: 1px solid rgba(255,255,255,0.2); border-radius:4px; padding:0.25rem;"></label>`;
-        html += `<button type="button" onclick="saveGoals()" style="background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.9rem; cursor: pointer;">Save goals</button></div>`;
-        if (goals_progress && Object.keys(goals_progress).length) {
-            Object.keys(goals_progress).forEach(k => {
-                const g = goals_progress[k];
-                if (g.goal == null) return;
-                const pct = Math.min(100, Math.round((g.current / g.goal) * 100));
-                html += `<div style="margin-bottom: 0.5rem;"><span style="font-size: 0.9rem;">${g.label}: ${g.current} / ${g.goal}</span><div style="background: rgba(255,255,255,0.1); border-radius: 6px; height: 8px; overflow: hidden;"><div style="background: var(--accent); height: 100%; width: ${pct}%;"></div></div></div>`;
-            });
-        }
-        html += `</div>`;
-
-        // Team comparison (opt-in)
-        html += `<h3 class="chart-section-title">Compare to team average</h3><div class="card" style="margin-bottom: 1rem;">`;
-        html += `<label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="checkbox" id="team-optin" ${team_optin ? 'checked' : ''} onchange="setTeamOptin(this.checked)"> Include my summary in team average (opt-in)</label>`;
-        if (team_comparison && team_comparison.participant_count > 0) {
-            const y = team_comparison.your_totals;
-            const a = team_comparison.team_average;
-            html += `<p style="font-size: 0.9rem; margin-top: 0.75rem; margin-bottom: 0;">You vs team average (${team_comparison.participant_count} participant(s)): Tickets ${y.jira} vs ${a.jira} · Changes ${y.gerrit} vs ${a.gerrit} · Messages ${y.slack} vs ${a.slack}.</p>`;
-        }
-        html += `</div>`;
-
-        // Snapshots: save a checkpoint and compare later
-        html += `<h3 class="chart-section-title">Snapshots</h3><div class="card" style="margin-bottom: 1rem;">`;
-        html += `<p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Save a checkpoint (e.g. "Q1 check-in") to compare your progress later.</p>`;
-        html += `<div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-bottom: 0.75rem;"><input type="text" id="snapshot-label" placeholder="e.g. Q1 check-in" style="width:12rem; background: var(--bg); color: var(--text); border: 1px solid rgba(255,255,255,0.2); border-radius:4px; padding:0.35rem 0.5rem; font-size: 0.9rem;"><button type="button" onclick="saveSnapshot()" style="background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.9rem; cursor: pointer;">Save snapshot</button></div>`;
-        if (snapshots && snapshots.length > 0) {
-            const latest = snapshots[snapshots.length - 1];
-            const s = latest.totals || {};
-            html += `<p style="font-size: 0.9rem; margin-bottom: 0.5rem;"><strong>Latest:</strong> "${latest.label}" (${latest.date}) — Tickets ${s.jira || 0}, Changes ${s.gerrit || 0}, Messages ${s.slack || 0}.</p>`;
-            html += `<p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0;">Now vs then: Tickets ${totals.jira} vs ${s.jira || 0} · Changes ${totals.gerrit} vs ${s.gerrit || 0} · Messages ${totals.slack} vs ${s.slack || 0}.</p>`;
-            html += `<p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">Saved: ${snapshots.map(s => s.label + ' (' + s.date + ')').join(' · ')}</p>`;
-        }
-        html += `</div>`;
-
-        // Activity over time — descriptive timeline with human-readable months and labels
-        if (data.monthly && data.monthly.length) {
-            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            const formatMonth = (ym) => {
-                const parts = (ym || '').split('-');
-                if (parts.length === 2) {
-                    const y = parts[0], m = parseInt(parts[1], 10);
-                    return (monthNames[m - 1] || parts[1]) + ' ' + y;
-                }
-                return ym || '—';
-            };
-            const plural = (n, one, many) => n === 1 ? one : many;
-            const rows = data.monthly.slice().sort((a, b) => a.month.localeCompare(b.month));
-            const maxTotal = Math.max(...rows.map(m => (m.jira_count || 0) + (m.gerrit_count || 0) + (m.confluence_count || 0) + (m.slack_count || 0)), 1);
-            html += `<h3 class="chart-section-title">Activity over time</h3>`;
-            html += `<p class="dashboard-activity-desc">Your tickets, code reviews, Confluence pages, and Slack messages by month — when you were most active.</p>`;
-            html += `<div class="card dashboard-activity-card">`;
-            html += `<div class="dashboard-activity-legend">`;
-            html += `<span class="dashboard-activity-legend-item"><span class="dashboard-activity-dot dashboard-activity-dot-jira"></span> Jira tickets</span>`;
-            html += `<span class="dashboard-activity-legend-item"><span class="dashboard-activity-dot dashboard-activity-dot-gerrit"></span> Gerrit changes</span>`;
-            html += `<span class="dashboard-activity-legend-item"><span class="dashboard-activity-dot dashboard-activity-dot-confluence"></span> Confluence</span>`;
-            html += `<span class="dashboard-activity-legend-item"><span class="dashboard-activity-dot dashboard-activity-dot-slack"></span> Slack</span>`;
-            html += `</div>`;
-            rows.forEach(m => {
-                const j = m.jira_count || 0;
-                const g = m.gerrit_count || 0;
-                const c = m.confluence_count || 0;
-                const s = m.slack_count || 0;
-                const sum = j + g + c + s;
-                const totalWidth = maxTotal ? (sum / maxTotal) * 100 : 0;
-                const jiraWidth = sum ? (j / sum) * totalWidth : 0;
-                const gerritWidth = sum ? (g / sum) * totalWidth : 0;
-                const confluenceWidth = sum ? (c / sum) * totalWidth : 0;
-                const slackWidth = sum ? (s / sum) * totalWidth : 0;
-                const parts = [];
-                if (j) parts.push(j + ' ' + plural(j, 'ticket', 'tickets'));
-                if (g) parts.push(g + ' ' + plural(g, 'change', 'changes'));
-                if (c) parts.push(c + ' ' + plural(c, 'page', 'pages'));
-                if (s) parts.push(s + ' ' + plural(s, 'message', 'messages'));
-                const legend = parts.length ? parts.join(' · ') : 'No activity';
-                html += `
-                    <div class="dashboard-activity-row">
-                        <span class="dashboard-activity-month">${formatMonth(m.month)}</span>
-                        <div class="dashboard-activity-bar-bg">
-                            <div class="chart-bar-jira" style="width:${jiraWidth || 0}%;" title="Jira: ${j}"></div>
-                            <div class="chart-bar-gerrit" style="width:${gerritWidth || 0}%;" title="Gerrit: ${g}"></div>
-                            <div class="chart-bar-confluence" style="width:${confluenceWidth || 0}%;" title="Confluence: ${c}"></div>
-                            <div class="chart-bar-slack" style="width:${slackWidth || 0}%;" title="Slack: ${s}"></div>
-                        </div>
-                        <span class="dashboard-activity-count">${legend}</span>
-                    </div>
-                `;
-            });
-            const totalJ = rows.reduce((a, m) => a + (m.jira_count || 0), 0);
-            const totalG = rows.reduce((a, m) => a + (m.gerrit_count || 0), 0);
-            const totalC = rows.reduce((a, m) => a + (m.confluence_count || 0), 0);
-            const totalS = rows.reduce((a, m) => a + (m.slack_count || 0), 0);
-            html += `<p class="dashboard-activity-footer">Total in this period: <strong>${totalJ} tickets</strong> · <strong>${totalG} changes</strong>${totalC ? ' · <strong>' + totalC + ' pages</strong>' : ''}${totalS ? ' · <strong>' + totalS + ' messages</strong>' : ''}</p>`;
-            html += `</div>`;
-        }
-
-        const monthsQ = (data.months || 12);
-        const gm = gerrit_metrics || {};
-        const jm = jira_metrics || {};
-        if (gm.merged_count !== undefined || gm.reviewed_count !== undefined || jm.done_count !== undefined) {
-            html += `<h3 class="chart-section-title">Review & delivery</h3>`;
-            html += `<div class="card" style="margin-bottom: 1rem;">`;
-            if (gm.total_changes !== undefined && gm.merged_count !== undefined) {
-                const medMerge = (gm.merge_time_percentiles && gm.merge_time_percentiles[50]) ? gm.merge_time_percentiles[50] + 'd' : '—';
-                const p95Merge = (gm.merge_time_percentiles && gm.merge_time_percentiles[95]) ? gm.merge_time_percentiles[95] + 'd' : '';
-                html += `<p style="margin-bottom: 0.5rem;"><span class="badge badge-gerrit">Code</span> <strong>${gm.merged_count || 0}</strong> changes merged, ${gm.merge_rate_pct || 0}% merge rate, median ${medMerge} to merge${p95Merge ? ', p95 ' + p95Merge : ''}. ${gm.reviewed_count ? ' <strong>' + gm.reviewed_count + '</strong> patches you reviewed.' : ''} <a href="/gerrit?months=${monthsQ}" style="color: var(--accent); font-size: 0.9rem;">Gerrit →</a></p>`;
-            }
-            if (jm.total_tickets !== undefined && jm.done_count !== undefined) {
-                const medDone = (jm.time_to_resolution_percentiles && jm.time_to_resolution_percentiles[50]) ? jm.time_to_resolution_percentiles[50] + 'd' : '—';
-                const medReview = (jm.median_days_in_review != null) ? jm.median_days_in_review + 'd' : '—';
-                html += `<p style="margin-bottom: 0;"><span class="badge badge-jira">Tickets</span> <strong>${jm.done_count || 0}</strong> done, ${jm.done_rate_pct || 0}% done rate, median ${medDone} to done, median ${medReview} in review. <a href="/jira?months=${monthsQ}" style="color: var(--accent); font-size: 0.9rem;">Jira →</a></p>`;
-            }
-            html += `</div>`;
-        }
-
-        if (gerrit_metrics && gerrit_metrics.total_changes > 0) {
-            const m = gerrit_metrics;
-            html += `<h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Work Wrapped (Gerrit)</h3>`;
-            html += `<div class="grid metrics-grid" style="margin-bottom: 1rem;">`;
-            html += `<div class="card"><strong>${m.total_changes}</strong> changes</div>`;
-            html += `<div class="card"><strong>${m.merged_count}</strong> merged · ${m.merge_rate_pct}% merge rate</div>`;
-            html += `<div class="card"><strong>${m.open_count}</strong> open</div>`;
-            html += `<div class="card"><strong>${m.abandoned_count}</strong> abandoned</div>`;
-            html += `<div class="card"><strong>+${m.lines_added}</strong> / <strong>−${m.lines_removed}</strong> lines</div>`;
-            html += `<div class="card"><strong>${m.projects_count}</strong> projects</div>`;
-            if (m.avg_merge_days !== null && m.avg_merge_days !== undefined) {
-                html += `<div class="card"><strong>${m.avg_merge_days}</strong> days avg to merge</div>`;
-            }
-            if (m.busiest_month) {
-                const monthLabel = m.busiest_month.replace('-', ' ');
-                html += `<div class="card">Busiest month: <strong>${monthLabel}</strong> (${m.busiest_month_count} changes)</div>`;
-            }
-            html += `</div>`;
-            if (m.top_reviewers && m.top_reviewers.length) {
-                html += `<p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">Reviewers you involved: `;
-                html += m.top_reviewers.map(r => `<span class="badge badge-gerrit" style="margin-right: 0.25rem;">${r[0]} (${r[1]})</span>`).join('');
-                html += `</p>`;
-            }
-            if (m.per_root_merge && m.per_root_merge.length) {
-                html += `<p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Avg days to merge by path: `;
-                html += m.per_root_merge.map(p => `<span class="badge badge-jira" style="margin-right: 0.25rem;">${p[0]} (${p[1]}d, ${p[2]})</span>`).join('');
-                html += `</p>`;
-            }
-            if (m.top_branches && m.top_branches.length) {
-                html += `<p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Top branches: `;
-                html += m.top_branches.map(b => `<span class="badge badge-gerrit" style="margin-right: 0.25rem;">${b[0]} (${b[1]})</span>`).join('');
-                html += `</p>`;
-            }
-        }
-        if (jira_metrics && jira_metrics.total_tickets > 0) {
-            const m = jira_metrics;
-            html += `<h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Work Wrapped (Jira)</h3>`;
-            html += `<div class="grid metrics-grid" style="margin-bottom: 1rem;">`;
-            html += `<div class="card"><strong>${m.total_tickets}</strong> tickets</div>`;
-            if (m.created_by_me !== undefined) html += `<div class="card"><strong>${m.created_by_me}</strong> created by me</div>`;
-            if (m.assigned_to_me !== undefined) html += `<div class="card"><strong>${m.assigned_to_me}</strong> assigned to me</div>`;
-            if (m.created_by_me_assigned_to_other !== undefined) html += `<div class="card"><strong>${m.created_by_me_assigned_to_other}</strong> created by me, assigned to others</div>`;
-            html += `<div class="card"><strong>${m.done_count}</strong> done · ${m.done_rate_pct}%</div>`;
-            html += `<div class="card"><strong>${m.open_count}</strong> open</div>`;
-            html += `<div class="card"><strong>${m.projects_count}</strong> projects</div>`;
-            if (m.busiest_month) {
-                const monthLabel = m.busiest_month.replace('-', ' ');
-                html += `<div class="card">Busiest month: <strong>${monthLabel}</strong> (${m.busiest_month_count})</div>`;
-            }
-            html += `</div>`;
-            if (m.who_grabbed && m.who_grabbed.length) {
-                html += `<p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">Tickets you created, assigned to others: `;
-                html += m.who_grabbed.map(w => `<span class="badge badge-slack" style="margin-right: 0.25rem;">${w[0]} (${w[1]})</span>`).join('');
-                html += `</p>`;
-            }
-            const totalTickets = m.total_tickets || 0;
-            if (m.top_statuses && m.top_statuses.length && totalTickets > 0) {
-                html += `<h4 class="chart-section-title">By status</h4><div class="card"><div class="circle-grid">`;
-                m.top_statuses.forEach(s => {
-                    const name = s[0];
-                    const count = s[1];
-                    const pct = Math.round((count / totalTickets) * 100);
-                    html += `
-                        <div class="circle-card">
-                          <div class="circle" style="background: conic-gradient(var(--jira) 0 ${pct}%, rgba(255,255,255,0.06) ${pct}% 100%);">
-                            <div class="circle-inner">${pct}%</div>
-                          </div>
-                          <div class="circle-caption">${name} (${count})</div>
-                        </div>
-                    `;
-                });
-                html += `</div></div>`;
-            }
-            if (m.top_issuetypes && m.top_issuetypes.length && totalTickets > 0) {
-                html += `<h4 class="chart-section-title">By type</h4><div class="card"><div class="circle-grid">`;
-                m.top_issuetypes.forEach(t => {
-                    const name = t[0];
-                    const count = t[1];
-                    const pct = Math.round((count / totalTickets) * 100);
-                    html += `
-                        <div class="circle-card">
-                          <div class="circle" style="background: conic-gradient(var(--confluence) 0 ${pct}%, rgba(255,255,255,0.06) ${pct}% 100%);">
-                            <div class="circle-inner">${pct}%</div>
-                          </div>
-                          <div class="circle-caption">${name} (${count})</div>
-                        </div>
-                    `;
-                });
-                html += `</div></div>`;
-            }
-            if (m.top_epics && m.top_epics.length && totalTickets > 0) {
-                html += `<h4 class="chart-section-title">Tickets by Epic Link</h4><div class="card"><div class="circle-grid">`;
-                m.top_epics.forEach(e => {
-                    const name = e[0];
-                    const count = e[1];
-                    const pct = Math.round((count / totalTickets) * 100);
-                    html += `
-                        <div class="circle-card">
-                          <div class="circle" style="background: conic-gradient(var(--jira) 0 ${pct}%, rgba(255,255,255,0.06) ${pct}% 100%);">
-                            <div class="circle-inner">${pct}%</div>
-                          </div>
-                          <div class="circle-caption">${name} (${count})</div>
-                        </div>
-                    `;
-                });
-                html += `</div></div>`;
-            }
-        }
-        if (themes.length) {
-            html += `<h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Projects</h3><p style="margin-bottom: 1rem;">`;
-            html += themes.map(t => `<span class="badge badge-jira" style="margin-right: 0.25rem;">${t.name} (${t.count})</span>`).join('');
-            html += `</p>`;
-        }
-        if (confluence_metrics && (confluence_metrics.created_count !== undefined || confluence_metrics.top_spaces)) {
-            const cm = confluence_metrics;
-            html += `<h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Confluence</h3><div class="card" style="margin-bottom: 1rem;">`;
-            if (cm.created_count !== undefined || cm.updated_count !== undefined) html += `<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Pages created: <strong>${cm.created_count || 0}</strong> · Updated (with activity): <strong>${cm.updated_count || 0}</strong></p>`;
-            if (cm.top_spaces && cm.top_spaces.length) html += `<p style="font-size: 0.85rem; color: var(--text-muted);">Top spaces: ${cm.top_spaces.slice(0, 5).map(s => s[0] + ' (' + s[1] + ')').join(' · ')}</p>`;
-            html += `</div>`;
-        }
-        if (slack_metrics && (slack_metrics.top_channels || (slack_metrics.messages_by_month && slack_metrics.messages_by_month.length))) {
-            const sm = slack_metrics;
-            html += `<h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Slack activity</h3><div class="card" style="margin-bottom: 1rem;">`;
-            if (sm.top_channels && sm.top_channels.length) html += `<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Most active channels: ${sm.top_channels.slice(0, 5).map(c => c[0] + ' (' + c[1] + ')').join(' · ')}</p>`;
-            if (sm.messages_by_month && sm.messages_by_month.length) {
-                const maxSlack = Math.max(...sm.messages_by_month.map(m => m[1]), 1);
-                sm.messages_by_month.slice(-12).forEach(m => { const pct = (m[1] / maxSlack) * 100; html += `<div class="dashboard-activity-row"><span class="dashboard-activity-month">${m[0]}</span><div class="dashboard-activity-bar-bg"><div class="chart-bar-slack" style="width:${pct}%;" title="${m[1]}"></div></div><span class="dashboard-activity-count">${m[1]} messages</span></div>`; });
-            }
-            html += `</div>`;
-        }
-        document.getElementById('personal-content').innerHTML = html;
+        document.getElementById('overview-content').innerHTML = html;
     }
 
-    async function loadTeam() {
-        const res = await fetch('/api/team');
-        if (res.status === 401) {
-            window.location.href = '/login';
-            return;
-        }
-        const data = await res.json();
-        let html = `
-            <h3 style="margin-bottom: 0.5rem;">${data.team} Team</h3>
-            <p style="color: var(--text-muted); margin-bottom: 1rem;">${data.highlights.join(' · ')}</p>
-            <div class="grid" style="margin-bottom: 1rem;">
-                <div class="card"><span class="badge badge-jira">Jira</span> ${data.totals.jira}</div>
-                <div class="card"><span class="badge badge-gerrit">Gerrit</span> ${data.totals.gerrit}</div>
-                <div class="card"><span class="badge badge-confluence">Confluence</span> ${data.totals.confluence}</div>
-                <div class="card"><span class="badge badge-slack">Slack</span> ${data.totals.slack}</div>
-            </div>
-        `;
-        if (data.themes.length) {
-            html += `<h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Team Themes</h3><p>`;
-            html += data.themes.map(t => `<span class="badge badge-jira" style="margin-right: 0.25rem;">${t.name} (${t.count})</span>`).join('');
-            html += `</p>`;
-        }
-        document.getElementById('team-content').innerHTML = html;
-    }
-
-    (function initPersonal() {
-        const params = new URLSearchParams(window.location.search);
-        const urlMonths = params.get('months');
-        if (urlMonths) {
-            const m = parseInt(urlMonths, 10);
-            if ([3, 6, 12, 24, 36].includes(m)) loadPersonal(m);
-            else loadPersonal();
-        } else loadPersonal();
-    })();
-    loadTeam();
+    loadOverview();
 </script>
 {% endblock %}

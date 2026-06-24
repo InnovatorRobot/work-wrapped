@@ -1,0 +1,554 @@
+{% extends "base.html" %}
+{% block title %}1:1 meetings - Work Wrapped{% endblock %}
+
+{% block content %}
+<section>
+    <div class="mtg-head">
+        <div>
+            <h2 class="page-title">1:1 meetings</h2>
+            <p class="page-subtitle">Agenda seeded from your activity, with notes and action items that carry forward.
+            </p>
+        </div>
+        <button class="btn btn-primary" onclick="toggleNewForm(true)">+ New 1:1</button>
+    </div>
+
+    <div class="card new-form" id="new-form" style="display:none;">
+        <div class="section-label">New 1:1</div>
+        <div class="form-inline">
+            <div>
+                <label>Date</label>
+                <input type="date" id="nf-date">
+            </div>
+            <div class="grow">
+                <label>Title (optional)</label>
+                <input type="text" id="nf-title" placeholder="e.g. 1:1 with Alex">
+            </div>
+        </div>
+        <label class="seed-row">
+            <input type="checkbox" id="nf-seed" checked>
+            <span>Seed the agenda from my latest activity &amp; nudges (and carry forward open actions)</span>
+        </label>
+        <div class="form-inline">
+            <button class="btn btn-primary" id="nf-create" onclick="createMeeting()">Create 1:1</button>
+            <button class="btn btn-ghost" onclick="toggleNewForm(false)">Cancel</button>
+        </div>
+    </div>
+
+    <div class="mtg-grid">
+        <aside id="mtg-list" class="mtg-list"></aside>
+        <div id="mtg-detail" class="mtg-detail"></div>
+    </div>
+</section>
+
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block head %}
+<style>
+    .mtg-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.2rem;
+    }
+
+    .new-form {
+        max-width: 760px;
+        margin-bottom: 1.4rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+    }
+
+    .form-inline {
+        display: flex;
+        gap: 0.8rem;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .form-inline .grow {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .form-inline label {
+        display: block;
+        margin-bottom: 0.35rem;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+    }
+
+    .seed-row {
+        display: flex;
+        gap: 0.6rem;
+        align-items: flex-start;
+        font-size: 0.86rem;
+        color: var(--text-muted);
+        cursor: pointer;
+    }
+
+    .seed-row input {
+        margin-top: 0.15rem;
+        accent-color: var(--accent);
+    }
+
+    .mtg-grid {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 1.2rem;
+        align-items: start;
+    }
+
+    @media (max-width: 760px) {
+        .mtg-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .mtg-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .mtg-list-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        text-align: left;
+        padding: 0.7rem 0.85rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--line);
+        background: var(--card);
+        cursor: pointer;
+        font-family: inherit;
+        transition: border-color .15s ease, background .15s ease;
+    }
+
+    .mtg-list-item:hover {
+        border-color: var(--accent-ring);
+    }
+
+    .mtg-list-item.active {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+    }
+
+    .mtg-li-date {
+        font-size: 0.78rem;
+        color: var(--text-faint);
+    }
+
+    .mtg-li-title {
+        font-weight: 600;
+        color: var(--text);
+        font-size: 0.92rem;
+    }
+
+    .mtg-status {
+        display: inline-block;
+        align-self: flex-start;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.1rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--line-strong);
+        color: var(--text-muted);
+    }
+
+    .mtg-status.status-completed {
+        color: var(--success);
+        border-color: rgba(63, 178, 127, 0.4);
+        background: rgba(63, 178, 127, 0.10);
+    }
+
+    .mtg-status.status-scheduled {
+        color: var(--accent);
+        border-color: var(--accent-ring);
+        background: var(--accent-soft);
+    }
+
+    .mtg-detail-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.2rem;
+    }
+
+    .mtg-title-input {
+        font-size: 1.15rem;
+        font-weight: 700;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text);
+        width: 100%;
+        padding: 0.2rem 0.3rem;
+        margin: -0.2rem -0.3rem 0.3rem;
+        border-radius: var(--radius-sm);
+    }
+
+    .mtg-title-input:hover,
+    .mtg-title-input:focus {
+        border-color: var(--line-strong);
+        background: var(--bg-elevated);
+    }
+
+    .mtg-sub {
+        display: flex;
+        gap: 0.7rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .row-item {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .row-item .ag-text,
+    .row-item .ac-text {
+        flex: 1;
+        min-width: 80px;
+    }
+
+    .row-item input[type="checkbox"] {
+        width: 1.05rem;
+        height: 1.05rem;
+        accent-color: var(--success);
+        flex-shrink: 0;
+    }
+
+    .row-item .ac-owner {
+        width: auto;
+    }
+
+    .row-item .ac-due {
+        width: auto;
+    }
+
+    .row-x {
+        border: none;
+        background: transparent;
+        color: var(--text-faint);
+        cursor: pointer;
+        font-size: 1.15rem;
+        line-height: 1;
+        padding: 0 0.25rem;
+        flex-shrink: 0;
+    }
+
+    .row-x:hover {
+        color: var(--error);
+    }
+
+    .seed-tag,
+    .carry-tag {
+        font-size: 0.68rem;
+        font-weight: 600;
+        padding: 0.08rem 0.4rem;
+        border-radius: 999px;
+        flex-shrink: 0;
+    }
+
+    .seed-tag {
+        color: var(--accent);
+        background: var(--accent-soft);
+    }
+
+    .carry-tag {
+        color: var(--warning);
+        background: rgba(227, 160, 8, 0.12);
+    }
+
+    #d-notes {
+        width: 100%;
+        resize: vertical;
+    }
+
+    .mtg-footer {
+        display: flex;
+        gap: 0.6rem;
+        align-items: center;
+        margin-top: 1.5rem;
+        padding-top: 1.1rem;
+        border-top: 1px solid var(--line);
+    }
+
+    .btn-danger {
+        background: rgba(240, 97, 109, 0.10);
+        color: var(--error);
+        border: 1px solid rgba(240, 97, 109, 0.35);
+    }
+
+    .btn-danger:hover {
+        background: rgba(240, 97, 109, 0.18);
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const state = { meetings: [], selectedId: null };
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    function statusLabel(s) { return s === 'completed' ? 'Completed' : 'Scheduled'; }
+
+    function currentMeeting() {
+        return state.meetings.find(m => m.id === state.selectedId) || null;
+    }
+
+    async function loadMeetings(selectId) {
+        const res = await fetch('/api/meetings');
+        const data = await res.json();
+        state.meetings = data.meetings || [];
+        if (selectId) state.selectedId = selectId;
+        if (!currentMeeting()) state.selectedId = state.meetings.length ? state.meetings[0].id : null;
+        renderList();
+        renderDetail();
+    }
+
+    function renderList() {
+        const el = document.getElementById('mtg-list');
+        if (!state.meetings.length) {
+            el.innerHTML = '<p class="field-hint">No 1:1s yet. Create your first one.</p>';
+            return;
+        }
+        el.innerHTML = state.meetings.map(m => `
+            <button class="mtg-list-item ${m.id === state.selectedId ? 'active' : ''}" onclick="selectMeeting('${m.id}')">
+                <span class="mtg-li-date">${esc(m.date)}</span>
+                <span class="mtg-li-title">${esc(m.title)}</span>
+                <span class="mtg-status status-${m.status}">${statusLabel(m.status)}</span>
+            </button>`).join('');
+    }
+
+    function selectMeeting(id) {
+        state.selectedId = id;
+        renderList();
+        renderDetail();
+    }
+
+    function renderDetail() {
+        const el = document.getElementById('mtg-detail');
+        const m = currentMeeting();
+        if (!m) {
+            el.innerHTML = '<div class="card"><p class="field-hint">Select or create a 1:1 to see its agenda.</p></div>';
+            return;
+        }
+        const withWho = m.manager_name ? `<span class="field-hint">with ${esc(m.manager_name)}</span>` : '';
+        const statusBtn = m.status === 'completed'
+            ? `<button class="btn btn-ghost" onclick="setStatus('scheduled')">Reopen</button>`
+            : `<button class="btn btn-ghost" onclick="setStatus('completed')">Mark completed</button>`;
+        el.innerHTML = `
+            <div class="card">
+                <div class="mtg-detail-head">
+                    <div style="flex:1;">
+                        <input id="d-title" class="mtg-title-input" value="${esc(m.title)}">
+                        <div class="mtg-sub">
+                            <input type="date" id="d-date" value="${esc(m.date)}">
+                            ${withWho}
+                        </div>
+                    </div>
+                    <span class="mtg-status status-${m.status}">${statusLabel(m.status)}</span>
+                </div>
+
+                <div class="section-label">Agenda / talking points</div>
+                <div id="agenda-list"></div>
+                <button class="btn btn-ghost btn-sm" onclick="addAgenda()">+ Add item</button>
+
+                <div class="section-label" style="margin-top:1.4rem;">Notes</div>
+                <textarea id="d-notes" rows="5" placeholder="Decisions, discussion, follow-ups…">${esc(m.notes)}</textarea>
+
+                <div class="section-label" style="margin-top:1.4rem;">Action items</div>
+                <div id="action-list"></div>
+                <button class="btn btn-ghost btn-sm" onclick="addAction()">+ Add action</button>
+
+                <div class="mtg-footer">
+                    <button class="btn btn-primary" onclick="saveMeeting()">Save</button>
+                    ${statusBtn}
+                    <button class="btn btn-danger" style="margin-left:auto;" onclick="deleteMeeting()">Delete</button>
+                </div>
+            </div>`;
+        renderAgenda(m.agenda || []);
+        renderActions(m.action_items || []);
+    }
+
+    function renderAgenda(items) {
+        const el = document.getElementById('agenda-list');
+        if (!items.length) { el.innerHTML = '<p class="field-hint">No agenda items yet.</p>'; return; }
+        el.innerHTML = items.map(it => `
+            <div class="row-item" data-id="${esc(it.id || '')}" data-source="${esc(it.source || 'manual')}">
+                <input type="checkbox" class="ag-done" ${it.done ? 'checked' : ''} title="Mark done">
+                <input type="text" class="ag-text" value="${esc(it.text)}">
+                ${it.source === 'seed' ? '<span class="seed-tag">seeded</span>' : ''}
+                <button class="row-x" onclick="removeRow(this)" title="Remove">&times;</button>
+            </div>`).join('');
+    }
+
+    function addAgenda() {
+        const el = document.getElementById('agenda-list');
+        const hint = el.querySelector('.field-hint');
+        if (hint) el.innerHTML = '';
+        const div = document.createElement('div');
+        div.className = 'row-item';
+        div.dataset.source = 'manual';
+        div.innerHTML = '<input type="checkbox" class="ag-done">'
+            + '<input type="text" class="ag-text" placeholder="Talking point…">'
+            + '<button class="row-x" onclick="removeRow(this)" title="Remove">&times;</button>';
+        el.appendChild(div);
+        div.querySelector('.ag-text').focus();
+    }
+
+    function renderActions(items) {
+        const el = document.getElementById('action-list');
+        if (!items.length) { el.innerHTML = '<p class="field-hint">No action items yet.</p>'; return; }
+        el.innerHTML = items.map(it => `
+            <div class="row-item action" data-id="${esc(it.id || '')}">
+                <input type="checkbox" class="ac-done" ${it.status === 'done' ? 'checked' : ''} title="Mark done">
+                <input type="text" class="ac-text" value="${esc(it.text)}" placeholder="Action…">
+                <select class="ac-owner">
+                    <option value="me" ${it.owner !== 'manager' ? 'selected' : ''}>Me</option>
+                    <option value="manager" ${it.owner === 'manager' ? 'selected' : ''}>Manager</option>
+                </select>
+                <input type="date" class="ac-due" value="${esc(it.due_date || '')}">
+                ${it.carried_over ? '<span class="carry-tag" title="Carried from a previous 1:1">carried</span>' : ''}
+                <button class="row-x" onclick="removeRow(this)" title="Remove">&times;</button>
+            </div>`).join('');
+    }
+
+    function addAction() {
+        const el = document.getElementById('action-list');
+        const hint = el.querySelector('.field-hint');
+        if (hint) el.innerHTML = '';
+        const div = document.createElement('div');
+        div.className = 'row-item action';
+        div.innerHTML = '<input type="checkbox" class="ac-done">'
+            + '<input type="text" class="ac-text" placeholder="Action…">'
+            + '<select class="ac-owner"><option value="me" selected>Me</option><option value="manager">Manager</option></select>'
+            + '<input type="date" class="ac-due">'
+            + '<button class="row-x" onclick="removeRow(this)" title="Remove">&times;</button>';
+        el.appendChild(div);
+        div.querySelector('.ac-text').focus();
+    }
+
+    function removeRow(btn) { btn.closest('.row-item').remove(); }
+
+    function collectAgenda() {
+        return [...document.querySelectorAll('#agenda-list .row-item')].map(r => ({
+            id: r.dataset.id || undefined,
+            source: r.dataset.source || 'manual',
+            done: r.querySelector('.ag-done').checked,
+            text: r.querySelector('.ag-text').value.trim(),
+        })).filter(x => x.text);
+    }
+
+    function collectActions() {
+        return [...document.querySelectorAll('#action-list .row-item')].map(r => ({
+            id: r.dataset.id || undefined,
+            text: r.querySelector('.ac-text').value.trim(),
+            owner: r.querySelector('.ac-owner').value,
+            due_date: r.querySelector('.ac-due').value,
+            status: r.querySelector('.ac-done').checked ? 'done' : 'open',
+            carried_over: !!r.querySelector('.carry-tag'),
+        })).filter(x => x.text);
+    }
+
+    async function saveMeeting(extra) {
+        const m = currentMeeting();
+        if (!m) return;
+        const payload = Object.assign({
+            title: document.getElementById('d-title').value,
+            date: document.getElementById('d-date').value,
+            notes: document.getElementById('d-notes').value,
+            agenda: collectAgenda(),
+            action_items: collectActions(),
+        }, extra || {});
+        const res = await fetch('/api/meetings/' + m.id, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+            const d = await res.json();
+            showToast('Saved');
+            await loadMeetings(d.meeting.id);
+        } else {
+            showToast('Could not save');
+        }
+    }
+
+    async function setStatus(s) { await saveMeeting({ status: s }); }
+
+    async function deleteMeeting() {
+        const m = currentMeeting();
+        if (!m) return;
+        if (!confirm('Delete this 1:1 and its notes?')) return;
+        const res = await fetch('/api/meetings/' + m.id, { method: 'DELETE' });
+        if (res.ok) {
+            state.selectedId = null;
+            showToast('Deleted');
+            await loadMeetings();
+        } else {
+            showToast('Could not delete');
+        }
+    }
+
+    function toggleNewForm(show) {
+        document.getElementById('new-form').style.display = show ? 'flex' : 'none';
+        if (show) {
+            document.getElementById('nf-date').value = new Date().toISOString().slice(0, 10);
+            document.getElementById('nf-title').value = '';
+            document.getElementById('nf-seed').checked = true;
+            document.getElementById('nf-title').focus();
+        }
+    }
+
+    async function createMeeting() {
+        const btn = document.getElementById('nf-create');
+        btn.disabled = true;
+        btn.textContent = 'Creating…';
+        try {
+            const res = await fetch('/api/meetings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date: document.getElementById('nf-date').value,
+                    title: document.getElementById('nf-title').value,
+                    seed: document.getElementById('nf-seed').checked,
+                }),
+            });
+            if (res.ok) {
+                const d = await res.json();
+                toggleNewForm(false);
+                showToast('1:1 created');
+                await loadMeetings(d.meeting.id);
+            } else {
+                showToast('Could not create');
+            }
+        } catch (e) {
+            showToast('Could not create');
+        }
+        btn.disabled = false;
+        btn.textContent = 'Create 1:1';
+    }
+
+    loadMeetings();
+</script>
+{% endblock %}

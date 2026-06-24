@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Insights - Work Wrapped{% endblock %}
+{% block topbar_title %}Insights{% endblock %}
+
+{% block content %}
+<section>
+    <div
+        style="display:flex; justify-content:space-between; align-items:flex-end; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+        <div>
+            <h2 class="page-title" style="margin:0 0 0.2rem;">Insights</h2>
+            <p class="page-subtitle" style="margin:0;">AI summaries, ask your data, and how this period compares.</p>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+            <label for="time-range-select" style="color:var(--text-muted); font-size:0.85rem;">Range</label>
+            <select id="time-range-select" onchange="changeTimeRange(this.value)"></select>
+        </div>
+    </div>
+
+    <div class="card" id="ai-summary-card" style="margin-bottom:1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+            <div>
+                <h3 style="font-size:0.95rem; margin:0 0 0.2rem;">AI summary</h3>
+                <p style="font-size:0.82rem; color:var(--text-muted); margin:0;">A short narrative of what you worked
+                    on, written locally by an LLM from your activity.</p>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" id="ai-summary-btn"
+                onclick="generateAiSummary()">Generate</button>
+        </div>
+        <div id="ai-summary-out" style="display:none; margin-top:0.85rem;"></div>
+    </div>
+
+    <div class="card" id="qa-card" style="margin-bottom:1rem;">
+        <h3 style="font-size:0.95rem; margin:0 0 0.2rem;">Ask your data</h3>
+        <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.6rem;">Ask questions about your activity —
+            answered locally, nothing leaves your machine.</p>
+        <div id="qa-thread" style="display:none; margin-bottom:0.6rem; max-height:340px; overflow-y:auto;"></div>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+            <input type="text" id="qa-input" placeholder="e.g. What did I focus on most this period?"
+                style="flex:1; min-width:220px;" onkeydown="if(event.key==='Enter')askQuestion()">
+            <button class="btn btn-primary btn-sm" id="qa-send" onclick="askQuestion()">Ask</button>
+        </div>
+        <div style="margin-top:0.5rem; display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-ghost btn-sm"
+                onclick="askQuestion('What did I focus on most this period?')">What did I focus on?</button>
+            <button type="button" class="btn btn-ghost btn-sm"
+                onclick="askQuestion('Which projects stalled or went quiet?')">What stalled?</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="askQuestion('Summarize my code reviews.')">My
+                reviews</button>
+            <button type="button" class="btn btn-ghost btn-sm"
+                onclick="askQuestion('How does this period compare to before?')">Trend vs before</button>
+        </div>
+    </div>
+
+    <div id="insights-dynamic">
+        <p style="color:var(--text-muted);">Loading…</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentMonths = 12;
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    async function loadInsights(monthsParam) {
+        let url = monthsParam != null ? '/api/personal?months=' + monthsParam : '/api/personal';
+        const res = await fetch(url);
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (data.months != null) currentMonths = data.months;
+        renderInsights(data);
+    }
+    function changeTimeRange(m) { loadInsights(parseInt(m, 10)); }
+
+    function renderInsights(data) {
+        const options = data.time_range_options || [[12, 'Last 12 months']];
+        const sel = document.getElementById('time-range-select');
+        sel.innerHTML = options.map(([m, label]) => `<option value="${m}" ${(data.months || 12) === m ? 'selected' : ''}>${esc(label)}</option>`).join('');
+
+        const trend = (cur, prev) => prev === 0 ? (cur > 0 ? '+' : '') : ((cur - prev) / prev * 100).toFixed(0);
+        let html = '';
+
+        const hl = data.highlights || [];
+        if (hl.length) {
+            html += `<h3 class="chart-section-title">Talking points</h3><div class="card" style="margin-bottom:1rem;"><p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem;">For 1:1 or self-review:</p><ul style="margin:0; padding-left:1.25rem; font-size:0.9rem;">${hl.map(h => '<li>' + esc(h) + '</li>').join('')}</ul></div>`;
+        }
+
+        const pc = data.period_comparison;
+        if (pc) {
+            const c = pc.current_6m, p = pc.previous_6m;
+            html += `<h3 class="chart-section-title">Last 6 months vs previous 6</h3><div class="card" style="margin-bottom:1rem;"><p style="font-size:0.9rem; margin:0;">Tickets: <strong>${c.jira}</strong> vs ${p.jira} (${trend(c.jira, p.jira)}%). Changes: <strong>${c.gerrit}</strong> vs ${p.gerrit} (${trend(c.gerrit, p.gerrit)}%). Messages: <strong>${c.slack}</strong> vs ${p.slack} (${trend(c.slack, p.slack)}%).</p></div>`;
+        }
+        const mom = data.month_over_month;
+        if (mom) {
+            const l = mom.last, p = mom.previous;
+            html += `<h3 class="chart-section-title">Vs last month</h3><div class="card" style="margin-bottom:1rem;"><p style="font-size:0.9rem; margin:0;">${esc(mom.last_month)}: Tickets ${l.jira} (${trend(l.jira, p.jira)}%), Changes ${l.gerrit} (${trend(l.gerrit, p.gerrit)}%), Messages ${l.slack} (${trend(l.slack, p.slack)}%) vs ${esc(mom.previous_month)}.</p></div>`;
+        }
+        const sm = data.same_month_last_year;
+        if (sm) {
+            const c = sm.current, p = sm.previous;
+            html += `<h3 class="chart-section-title">Same month last year</h3><div class="card" style="margin-bottom:1rem;"><p style="font-size:0.9rem; margin:0;"><strong>${esc(sm.current_label)}</strong> vs <strong>${esc(sm.previous_label)}</strong> — Tickets ${c.jira} (${trend(c.jira, p.jira)}%), Changes ${c.gerrit} (${trend(c.gerrit, p.gerrit)}%), Pages ${c.confluence} (${trend(c.confluence, p.confluence)}%), Messages ${c.slack} (${trend(c.slack, p.slack)}%).</p></div>`;
+        }
+
+        const mo = data.months || 12;
+        html += `<h3 class="chart-section-title">Export &amp; share</h3>
+            <div class="card" style="margin-bottom:1rem;">
+                <p style="font-size:0.9rem; margin:0 0 0.6rem;"><span style="color:var(--text-muted);">Download:</span>
+                    <a href="/export/pdf?months=${mo}" style="color:var(--accent);">PDF</a> ·
+                    <a href="/export/onepager?months=${mo}" style="color:var(--accent);">One-pager PDF</a> ·
+                    <a href="/api/export/json?months=${mo}" style="color:var(--accent);" download="work-wrapped.json">JSON</a> ·
+                    <a href="/api/export/csv?months=${mo}" style="color:var(--accent);" download="work-wrapped.csv">CSV</a></p>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 0.5rem;">Create a read-only link to this summary (no login). Expires in 30 days.</p>
+                <button type="button" id="share-link-btn" class="btn btn-primary btn-sm" onclick="createShareLink()">Create shareable link</button>
+                <div id="share-link-result" style="display:none; margin-top:0.75rem;">
+                    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="share-link-url" readonly style="flex:1; min-width:12rem;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="copyShareLink()">Copy</button>
+                    </div>
+                </div>
+            </div>`;
+        document.getElementById('insights-dynamic').innerHTML = html;
+    }
+
+    async function generateAiSummary() {
+        const btn = document.getElementById('ai-summary-btn'), out = document.getElementById('ai-summary-out');
+        btn.disabled = true; btn.textContent = 'Generating…';
+        out.style.display = 'block';
+        out.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted); margin:0;">Asking the model… this can take a moment.</p>';
+        try {
+            const res = await fetch('/api/ai-summary?months=' + (currentMonths || 12));
+            const d = await res.json();
+            if (d.ok) {
+                out.innerHTML = '<div class="ai-summary-text" style="font-size:0.9rem; line-height:1.55; white-space:pre-wrap;"></div><div style="margin-top:0.6rem;"><button type="button" class="btn btn-secondary btn-sm" onclick="copyAiSummary(this)">Copy</button>' + (d.cached ? ' <span style="font-size:0.75rem; color:var(--text-faint);">cached</span>' : '') + '</div>';
+                out.querySelector('.ai-summary-text').textContent = d.narrative;
+            } else if (d.configured === false) {
+                out.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted); margin:0;">No local LLM configured. Set <code>OPENAI_BASE_URL</code> to your Ollama server in <code>.env</code> and restart.</p>';
+            } else {
+                out.innerHTML = '<p style="font-size:0.85rem; color:var(--error); margin:0;"></p>';
+                out.querySelector('p').textContent = d.error || 'Could not generate a summary.';
+            }
+        } catch (e) { out.innerHTML = '<p style="font-size:0.85rem; color:var(--error); margin:0;">Could not reach the server.</p>'; }
+        btn.disabled = false; btn.textContent = 'Generate';
+    }
+    function copyAiSummary(btn) {
+        const text = document.querySelector('#ai-summary-out .ai-summary-text');
+        if (!text) return;
+        navigator.clipboard.writeText(text.textContent).then(() => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 2000); });
+    }
+
+    const qaHistory = [];
+    function qaRender() {
+        const thread = document.getElementById('qa-thread');
+        if (!qaHistory.length) { thread.style.display = 'none'; return; }
+        thread.style.display = 'block';
+        thread.innerHTML = qaHistory.map(m => {
+            const who = m.role === 'user' ? 'You' : 'AI';
+            const bg = m.role === 'user' ? 'var(--accent-soft)' : 'var(--bg-elevated)';
+            return '<div style="margin-bottom:0.5rem;"><div style="font-size:0.7rem; color:var(--text-faint); margin-bottom:0.15rem;">' + who + '</div><div class="qa-msg" style="font-size:0.9rem; line-height:1.5; white-space:pre-wrap; background:' + bg + '; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0.5rem 0.7rem;"></div></div>';
+        }).join('');
+        const nodes = thread.querySelectorAll('.qa-msg');
+        qaHistory.forEach((m, i) => { if (nodes[i]) nodes[i].textContent = m.content; });
+        thread.scrollTop = thread.scrollHeight;
+    }
+    async function askQuestion(preset) {
+        const input = document.getElementById('qa-input');
+        const q = (preset || (input ? input.value : '') || '').trim();
+        if (!q) return;
+        if (input) input.value = '';
+        const priorHistory = qaHistory.filter(m => m.content && !m._pending);
+        qaHistory.push({ role: 'user', content: q });
+        qaHistory.push({ role: 'assistant', content: '…thinking (local model)…', _pending: true });
+        qaRender();
+        const btn = document.getElementById('qa-send'); if (btn) btn.disabled = true;
+        try {
+            const res = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q, history: priorHistory }) });
+            const d = await res.json();
+            qaHistory.pop();
+            if (d.ok) qaHistory.push({ role: 'assistant', content: d.answer });
+            else if (d.configured === false) qaHistory.push({ role: 'assistant', content: 'No local LLM is configured. Set OPENAI_BASE_URL to your Ollama server in .env and restart.' });
+            else qaHistory.push({ role: 'assistant', content: d.error || 'Could not answer.' });
+        } catch (e) { qaHistory.pop(); qaHistory.push({ role: 'assistant', content: 'Could not reach the server.' }); }
+        qaRender();
+        if (btn) btn.disabled = false;
+    }
+
+    async function createShareLink() {
+        const btn = document.getElementById('share-link-btn'), result = document.getElementById('share-link-result'), input = document.getElementById('share-link-url');
+        if (btn) btn.disabled = true;
+        try {
+            const res = await fetch('/api/share', { method: 'POST' });
+            const data = await res.json();
+            if (data.url && input) { input.value = data.url; if (result) result.style.display = 'block'; }
+        } catch (e) { }
+        if (btn) btn.disabled = false;
+    }
+    function copyShareLink() {
+        const input = document.getElementById('share-link-url');
+        if (input && input.value) navigator.clipboard.writeText(input.value).then(() => { const b = input.nextElementSibling; if (b) { b.textContent = 'Copied!'; setTimeout(() => b.textContent = 'Copy', 2000); } });
+    }
+
+    loadInsights();
+</script>
+{% endblock %}

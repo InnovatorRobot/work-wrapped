@@ -7,672 +7,102 @@
     <title>{% block title %}Work Wrapped{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #0f1419;
-            --card: #1a2332;
-            --card-hover: #243044;
-            --text: #e6edf3;
-            --text-muted: #8b949e;
-            --accent: #58a6ff;
-            --accent-soft: rgba(88, 166, 255, 0.15);
-            --jira: #2684ff;
-            --gerrit: #238636;
-            --confluence: #8250df;
-            --slack: #e01e5a;
-            --outlook: #0078d4;
-            --teams: #6264a7;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'DM Sans', -apple-system, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            line-height: 1.5;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        header {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            padding: 1.5rem 0;
-            margin-bottom: 2rem;
-        }
-
-        .header-brand {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .header-logo {
-            height: 2rem;
-            width: auto;
-            display: block;
-        }
-
-        header h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text);
-            margin: 0;
-        }
-
-        header p {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-top: 0.25rem;
-        }
-
-        nav {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        nav a {
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 0.9rem;
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
-        }
-
-        nav a:hover {
-            color: var(--accent);
-            background: var(--accent-soft);
-        }
-
-        nav a.active {
-            color: var(--accent);
-        }
-
-        .card {
-            background: var(--card);
-            border-radius: 10px;
-            padding: 1.25rem;
-            margin-bottom: 1rem;
-            border: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .card:hover {
-            background: var(--card-hover);
-        }
-
-        .card h3 {
-            font-size: 0.95rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .card p {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        .badge-jira {
-            background: rgba(38, 132, 255, 0.2);
-            color: #58a6ff;
-        }
-
-        .badge-gerrit {
-            background: rgba(35, 134, 54, 0.2);
-            color: #3fb950;
-        }
-
-        .badge-confluence {
-            background: rgba(130, 80, 223, 0.2);
-            color: #a371f7;
-        }
-
-        .badge-slack {
-            background: rgba(224, 30, 90, 0.2);
-            color: #f85149;
-        }
-
-        .badge-outlook {
-            background: rgba(0, 120, 212, 0.2);
-            color: #50a6e8;
-        }
-
-        .badge-teams {
-            background: rgba(98, 100, 167, 0.2);
-            color: #8b8fc9;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
-        }
-
-        input[type="search"],
-        select {
-            background: var(--card);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: var(--text);
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
-            font-size: 0.9rem;
-        }
-
-        input[type="search"]:focus,
-        select:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        /* Simple charts */
-        .chart-section-title {
-            font-size: 0.95rem;
-            margin: 1.5rem 0 0.5rem;
-        }
-
-        .chart-row {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.35rem;
-        }
-
-        .chart-label {
-            width: 4.2rem;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .chart-bar-bg {
-            flex: 1;
-            background: rgba(255, 255, 255, 0.04);
-            border-radius: 999px;
-            overflow: hidden;
-            height: 10px;
-            display: flex;
-        }
-
-        .chart-bar-jira {
-            background: var(--jira);
-            height: 100%;
-        }
-
-        .chart-bar-gerrit {
-            background: var(--gerrit);
-            height: 100%;
-        }
-
-        .chart-bar-confluence {
-            background: var(--confluence);
-            height: 100%;
-        }
-
-        .chart-bar-slack {
-            background: var(--slack);
-            height: 100%;
-        }
-
-        .chart-value {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            min-width: 5rem;
-            text-align: right;
-        }
-
-        /* Dashboard: Activity over time (fancy) */
-        .dashboard-activity-desc {
-            font-size: 0.88rem;
-            color: var(--text-muted);
-            margin: 0 0 1rem 0;
-            line-height: 1.4;
-        }
-
-        .dashboard-activity-card {
-            padding: 1.25rem;
-        }
-
-        .dashboard-activity-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .dashboard-activity-legend-item {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-        }
-
-        .dashboard-activity-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-        }
-
-        .dashboard-activity-dot-jira {
-            background: var(--jira);
-        }
-
-        .dashboard-activity-dot-gerrit {
-            background: var(--gerrit);
-        }
-
-        .dashboard-activity-dot-confluence {
-            background: var(--confluence);
-        }
-
-        .dashboard-activity-dot-slack {
-            background: var(--slack);
-        }
-
-        .dashboard-activity-row {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 0.6rem;
-        }
-
-        .dashboard-activity-month {
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: var(--text);
-            min-width: 5.5rem;
-        }
-
-        .dashboard-activity-bar-bg {
-            flex: 1;
-            background: rgba(255, 255, 255, 0.06);
-            border-radius: 6px;
-            height: 1.25rem;
-            overflow: hidden;
-            display: flex;
-        }
-
-        .dashboard-activity-bar-bg .chart-bar-jira,
-        .dashboard-activity-bar-bg .chart-bar-gerrit,
-        .dashboard-activity-bar-bg .chart-bar-confluence,
-        .dashboard-activity-bar-bg .chart-bar-slack {
-            min-width: 2px;
-            transition: width 0.2s ease;
-        }
-
-        .dashboard-activity-count {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            min-width: 10rem;
-            text-align: right;
-        }
-
-        .dashboard-activity-footer {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin: 1rem 0 0 0;
-            padding-top: 0.75rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        /* Jira: Epic Link metrics list */
-        .jira-epic-metrics {
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-        }
-
-        .jira-epic-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            padding: 0.35rem 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            font-size: 0.9rem;
-        }
-
-        .jira-epic-row:last-child {
-            border-bottom: none;
-        }
-
-        .jira-epic-name {
-            color: var(--text);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            min-width: 0;
-        }
-
-        .jira-epic-count {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-            flex-shrink: 0;
-        }
-
-        .jira-timing-no-data {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin: 0;
-            padding: 0.5rem 0;
-        }
-
-        .jira-timing-no-data code {
-            background: rgba(255, 255, 255, 0.08);
-            padding: 0.15rem 0.4rem;
-            border-radius: 4px;
-            font-size: 0.8rem;
-        }
-
-        /* Circular charts */
-        .circle-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-            gap: 0.75rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .circle-card {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-        }
-
-        .circle {
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: conic-gradient(var(--accent) 0deg, rgba(255, 255, 255, 0.06) 0deg);
-            position: relative;
-        }
-
-        .circle-inner {
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            background: var(--card);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            color: var(--text-muted);
-        }
-
-        .circle-caption {
-            margin-top: 0.35rem;
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            text-align: center;
-        }
-
-        /* Gerrit: time-to-merge distribution (bar/line chart) */
-        .gerrit-distribution-chart {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .gerrit-distribution-row {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .gerrit-distribution-label {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            min-width: 4.5rem;
-        }
-
-        .gerrit-distribution-bar-bg {
-            flex: 1;
-            background: rgba(255, 255, 255, 0.06);
-            border-radius: 4px;
-            height: 1.25rem;
-            overflow: hidden;
-        }
-
-        .gerrit-distribution-bar {
-            height: 100%;
-            background: var(--gerrit);
-            border-radius: 4px;
-            min-width: 2px;
-            transition: width 0.2s ease;
-        }
-
-        .gerrit-distribution-value {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            min-width: 2rem;
-            text-align: right;
-        }
-
-        /* Gerrit: percentile dropdown (p95/p99 patches) */
-        .gerrit-percentile-card {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
-
-        .gerrit-percentile-details {
-            margin-top: 0.5rem;
-            width: 100%;
-        }
-
-        .gerrit-percentile-details summary {
-            font-size: 0.85rem;
-            color: var(--accent);
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .gerrit-percentile-details summary:hover {
-            text-decoration: underline;
-        }
-
-        .gerrit-percentile-patches {
-            margin: 0.5rem 0 0 1rem;
-            padding-left: 0.5rem;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-
-        .gerrit-percentile-patches li {
-            margin-bottom: 0.35rem;
-        }
-
-        /* Gerrit: reviewers table */
-        .gerrit-reviewers-table-wrap {
-            overflow-x: auto;
-        }
-
-        .gerrit-reviewers-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-
-        .gerrit-reviewers-table th,
-        .gerrit-reviewers-table td {
-            padding: 0.4rem 0.75rem;
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .gerrit-reviewers-table th {
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        .gerrit-reviewers-table tbody tr:hover {
-            background: rgba(255, 255, 255, 0.03);
-        }
-
-        /* Gerrit: activity-over-time timeline (fancy) */
-        .gerrit-timeline-card {
-            margin-bottom: 1.5rem;
-        }
-
-        .gerrit-timeline-title {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-            color: var(--text);
-        }
-
-        .gerrit-timeline-desc {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 1rem;
-            line-height: 1.4;
-        }
-
-        .gerrit-timeline-chart {
-            display: flex;
-            flex-direction: column;
-            gap: 0.6rem;
-        }
-
-        .gerrit-timeline-row {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .gerrit-timeline-month {
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: var(--text);
-            min-width: 5.5rem;
-        }
-
-        .gerrit-timeline-bar-wrap {
-            flex: 1;
-            background: rgba(255, 255, 255, 0.06);
-            border-radius: 6px;
-            height: 1.5rem;
-            overflow: hidden;
-        }
-
-        .gerrit-timeline-bar {
-            height: 100%;
-            background: linear-gradient(90deg, var(--gerrit), rgba(35, 134, 54, 0.85));
-            border-radius: 6px;
-            min-width: 3px;
-            transition: width 0.25s ease;
-        }
-
-        .gerrit-timeline-count {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            min-width: 5rem;
-            text-align: right;
-        }
-
-        .gerrit-timeline-footer {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-top: 1rem;
-            margin-bottom: 0;
-            padding-top: 0.75rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        /* Jira timeline: same layout, Jira accent color */
-        .jira-timeline-card .jira-timeline-bar {
-            background: linear-gradient(90deg, var(--jira), rgba(38, 132, 255, 0.85));
-        }
-
-        /* AI opportunity (mock) card and button */
-        .ai-opportunity-card {
-            border: 1px dashed rgba(88, 166, 255, 0.35);
-            background: rgba(88, 166, 255, 0.04);
-        }
-
-        .ai-opportunity-card h3 {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.95rem;
-        }
-
-        .ai-opportunity-card .ai-opportunity-desc {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 0.75rem;
-            line-height: 1.4;
-        }
-
-        .ai-opportunity-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            background: var(--accent-soft);
-            color: var(--accent);
-            border: 1px solid rgba(88, 166, 255, 0.3);
-            cursor: default;
-            opacity: 0.9;
-        }
-
-        .ai-opportunity-btn:hover {
-            background: rgba(88, 166, 255, 0.2);
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <script>(function () { try { var t = localStorage.getItem('ww-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) { } })();</script>
     {% block head %}{% endblock %}
 </head>
 
 <body>
-    <div class="container">
-        <header>
-            <div class="header-brand">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="Zenseact" class="header-logo">
-                <h1>Work Wrapped</h1>
+    {% set route = current_route or request.endpoint %}
+    {% set logged_in = session.get('user_id') %}
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Zenseact" class="sidebar-logo">
+                <div>
+                    <div class="sidebar-title">Work Wrapped</div>
+                    <div class="sidebar-version">v{{ app_version }}</div>
+                </div>
             </div>
-            <p>Your work activity at a glance — for reflection, not ranking. <span
-                    style="font-size: 0.75rem; color: var(--text-muted);">v{{ app_version }}</span></p>
-            <nav>
-                <a href="/" class="{% if (current_route or request.endpoint) == 'index' %}active{% endif %}">Home</a>
-                <a href="/#team">Team View</a>
-                {% if session.get('user_id') %}
-                <a href="{{ url_for('gerrit_full') }}">Gerrit</a>
-                <a href="{{ url_for('jira_full') }}">Jira</a>
-                <a href="{{ url_for('confluence_full') }}">Confluence</a>
-                <a href="{{ url_for('slack_full') }}">Slack</a>
-                <a href="{{ url_for('outlook_full') }}">Outlook</a>
-                <a href="{{ url_for('teams_full') }}">Teams</a>
-                <a href="{{ url_for('logout') }}" style="margin-left: auto;">Log out</a>
-                {% endif %}
+
+            {% if logged_in %}
+            <nav class="sidebar-nav">
+                <a href="/" class="{% if route == 'index' %}active{% endif %}"><span class="ni">▤</span> Overview</a>
+
+                <div class="nav-group-label">Sources</div>
+                <a href="{{ url_for('gerrit_full') }}" class="{% if route == 'gerrit_full' %}active{% endif %}"><span
+                        class="ni">◆</span> Gerrit</a>
+                <a href="{{ url_for('jira_full') }}" class="{% if route == 'jira_full' %}active{% endif %}"><span
+                        class="ni">◆</span> Jira</a>
+                <a href="{{ url_for('confluence_full') }}"
+                    class="{% if route == 'confluence_full' %}active{% endif %}"><span class="ni">◆</span>
+                    Confluence</a>
+                <a href="{{ url_for('slack_full') }}" class="{% if route == 'slack_full' %}active{% endif %}"><span
+                        class="ni">◆</span> Slack</a>
+
+                <div class="nav-group-label">Reflect</div>
+                <a href="{{ url_for('insights_page') }}"
+                    class="{% if route == 'insights_page' %}active{% endif %}"><span class="ni">✦</span> Insights</a>
+                <a href="{{ url_for('goals_page') }}" class="{% if route == 'goals_page' %}active{% endif %}"><span
+                        class="ni">◎</span> Goals</a>
+                <a href="{{ url_for('meetings_page') }}"
+                    class="{% if route == 'meetings_page' %}active{% endif %}"><span class="ni">☷</span> 1:1s</a>
+
+                <div class="nav-group-label">Team</div>
+                <a href="{{ url_for('team_page') }}" class="{% if route == 'team_page' %}active{% endif %}"><span
+                        class="ni">⚇</span> Team</a>
+                <a href="{{ url_for('manager_page') }}" class="{% if route == 'manager_page' %}active{% endif %}"><span
+                        class="ni">⚐</span> Manager</a>
+
+                <div class="nav-group-label">Setup</div>
+                <a href="{{ url_for('connections_page') }}"
+                    class="{% if route == 'connections_page' %}active{% endif %}"><span class="ni">⚏</span>
+                    Connections</a>
+                <a href="{{ url_for('settings_page') }}"
+                    class="{% if route == 'settings_page' %}active{% endif %}"><span class="ni">⚙</span> Settings</a>
             </nav>
-        </header>
-        {% block content %}{% endblock %}
+
+            <div class="sidebar-footer">
+                <button type="button" class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark"
+                    aria-label="Toggle theme">&#9680; Theme</button>
+                <a href="{{ url_for('logout') }}" class="nav-logout">⏻ Log out</a>
+            </div>
+            {% endif %}
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+        <div class="app-main">
+            <header class="app-topbar">
+                {% if logged_in %}
+                <button type="button" class="menu-toggle" onclick="openSidebar()" aria-label="Open menu">☰</button>
+                {% endif %}
+                <div class="topbar-title">{% block topbar_title %}{% endblock %}</div>
+                <button type="button" class="theme-toggle topbar-theme" onclick="toggleTheme()"
+                    title="Toggle light/dark" aria-label="Toggle theme">&#9680;</button>
+            </header>
+
+            {% if session.get('demo_mode') %}
+            <div class="demo-banner">Demo mode — sample data, no real services connected.</div>
+            {% endif %}
+
+            <main class="app-content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
     </div>
+
+    <script>
+        function openSidebar() { document.getElementById('sidebar').classList.add('open'); var o = document.getElementById('sidebar-overlay'); if (o) o.classList.add('show'); }
+        function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); var o = document.getElementById('sidebar-overlay'); if (o) o.classList.remove('show'); }
+        function toggleTheme() {
+            var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            var next = isLight ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            try { localStorage.setItem('ww-theme', next); } catch (e) { }
+        }
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 

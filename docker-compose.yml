@@ -12,7 +12,61 @@ services:
       - "5001:5001"
     env_file:
       - .env
+    environment:
+      # Use the bundled PostgreSQL by default. Override in .env to point elsewhere,
+      # or unset to fall back to a local SQLite file under /app/data.
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://workwrapped:workwrapped@db:5432/work_wrapped}
+      # Talk to the bundled local Ollama LLM. Overrides OPENAI_BASE_URL from .env
+      # because inside the container "localhost" is the app itself, not the host.
+      OPENAI_BASE_URL: http://ollama:11434/v1
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-ollama}
+      OPENAI_MODEL: ${OPENAI_MODEL:-llama3.1:8b}
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     # Optional: mount .env so you can edit without rebuild (env_file takes precedence at build of container)
     # volumes:
     #   - ./.env:/app/.env:ro
     restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-workwrapped}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-workwrapped}
+      POSTGRES_DB: ${POSTGRES_DB:-work_wrapped}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-workwrapped} -d ${POSTGRES_DB:-work_wrapped}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # 100% local LLM. Uses your NVIDIA GPU when the NVIDIA Container Toolkit is
+  # installed; otherwise it runs on CPU. No work data ever leaves this machine.
+  # After 'docker compose up', pull the model once:
+  #   docker compose exec ollama ollama pull llama3.1:8b
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    # --- GPU (NVIDIA) ---  remove this 'deploy' block to run CPU-only.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  ollama:
+

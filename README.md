@@ -27,6 +27,7 @@ cp .env.example .env
 ```
 
 Optional:
+
 - `GERRIT_VERIFY_SSL=false` — Disable SSL verification (e.g. for self-signed certs)
 - `JIRA_URL` — Jira base URL (e.g. `https://your-company.atlassian.net`) to enable Jira ticket fetch
 - `JIRA_VERIFY_SSL=false` — Disable SSL verification for Jira
@@ -44,9 +45,47 @@ pip install -r requirements.txt
 python run.py
 ```
 
-Open http://localhost:5001 — you'll be redirected to login.
+Open <http://localhost:5001> — you'll be redirected to login.
 
 **Project layout:** Python code in `src/`, HTML in `frontend/`. The app loads `.env` from the project root.
+
+### Local AI summaries (100% on-device, private)
+
+The dashboard's **AI summary** card writes a short "what I worked on" narrative from your
+Gerrit/Jira/Confluence activity. It uses an **OpenAI-compatible API**, so you can run a model
+**entirely on your own machine** with [Ollama](https://ollama.com) — **no work data ever leaves
+the device**. Ollama uses your **NVIDIA/AMD GPU automatically** and falls back to **CPU**.
+
+**One-time setup:**
+
+```bash
+# 1. Install Ollama (user-space, no sudo)
+curl -fL https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst \
+  -o /tmp/ollama.tar.zst
+tar -I zstd -xf /tmp/ollama.tar.zst -C "$HOME/.local"      # binary -> ~/.local/bin/ollama
+# (or system-wide: curl -fsSL https://ollama.com/install.sh | sh)
+
+# 2. Start the server + pull the model (helper script does both)
+./scripts/ollama.sh                 # starts Ollama and pulls llama3.1:8b
+```
+
+Your `.env` is already pointed at it:
+
+```bash
+OPENAI_BASE_URL=http://localhost:11434/v1
+OPENAI_API_KEY=ollama          # any non-empty value; Ollama ignores it
+OPENAI_MODEL=llama3.1:8b        # ~4.9 GB, fits an 8 GB GPU. Swap for qwen2.5:7b, llama3.2:3b, etc.
+```
+
+Then start the app (`python run.py`) and click **Generate** on the AI summary card. The model is
+served locally; if Ollama isn't running, the card degrades gracefully with a clear message.
+
+> Picking a model: 7–8B (e.g. `llama3.1:8b`, `qwen2.5:7b`) for an 8 GB GPU; `llama3.2:3b` for
+> low VRAM or CPU-only. Pull any with `ollama pull <model>` and set `OPENAI_MODEL` to match.
+
+**With Docker:** `docker compose up` also starts a bundled `ollama` service (GPU-enabled via the
+NVIDIA Container Toolkit; remove the `deploy:` block in `docker-compose.yml` for CPU-only). Pull the
+model once with `docker compose exec ollama ollama pull llama3.1:8b`.
 
 ### Run with Docker
 
@@ -56,7 +95,7 @@ Have a `.env` file in the project root (see above), then:
 docker compose up --build
 ```
 
-Open http://localhost:5001. Environment variables are read from `.env` via `env_file` in `docker-compose.yml`.
+Open <http://localhost:5001>. Environment variables are read from `.env` via `env_file` in `docker-compose.yml`.
 
 **Including `.env` in the image:** If you have a `.env` file in the project root when you build, it is copied into the image. That way you can share a single image with your Gerrit/Jira/Confluence URLs (and other non-secret config) built in; recipients can run the container without creating their own `.env`. (They still use their own login credentials at the app’s login page.) If you build without a `.env`, the image falls back to `.env.example`.
 
@@ -81,6 +120,7 @@ docker tag work-wrapped:$(cat VERSION) work-wrapped:latest   # optional
 ```
 
 **When you release a new version:**  
+
 1. Update `VERSION` (e.g. to `1.0.1`).  
 2. Build and push: `VERSION=$(cat VERSION) docker compose build` then push to your registry as `work-wrapped:1.0.1`.  
 3. Colleagues pull and run: `docker pull yourregistry/work-wrapped:1.0.1` and `docker run -p 5001:5001 yourregistry/work-wrapped:1.0.1`. They can confirm the version in the app header or with `curl http://localhost:5001/api/version`.
@@ -91,6 +131,7 @@ To run the image without Compose:
 docker build -t work-wrapped .
 docker run -p 5001:5001 work-wrapped
 ```
+
 You can still override config at run time with `--env-file .env` or `-e VAR=value` if needed.
 
 ### Sharing the image with someone else
@@ -100,15 +141,19 @@ If you built the image with a `.env` in the project root, that config is inside 
 **Option A: Save/load as a file**
 
 On your machine (build with your `.env` in place so it’s in the image):
+
 ```bash
 docker build -t work-wrapped .
 docker save -o work-wrapped.tar work-wrapped
 ```
+
 Send `work-wrapped.tar`. On their machine:
+
 ```bash
 docker load -i work-wrapped.tar
 docker run -p 5001:5001 work-wrapped
 ```
+
 If you built without `.env`, they can run with their own: `docker run -p 5001:5001 --env-file .env work-wrapped`.
 
 **Option B: Push to a registry (Docker Hub, GHCR, etc.)**
@@ -117,11 +162,13 @@ If you built without `.env`, they can run with their own: `docker run -p 5001:50
 docker tag work-wrapped yourusername/work-wrapped:latest
 docker push yourusername/work-wrapped:latest
 ```
+
 They run: `docker pull yourusername/work-wrapped:latest` then `docker run -p 5001:5001 yourusername/work-wrapped:latest` (or with `--env-file .env` to override config).
 
 ### 3. Log in
 
 Use your **Gerrit email** and **HTTP Password**:
+
 - Email: your Gerrit account email
 - Password: Generate from **Gerrit → Settings → HTTP Password**
 
@@ -142,9 +189,9 @@ If `JIRA_URL` is set, the login page shows optional **Jira email** and **Jira AP
 ## Next Steps
 
 1. Confluence API integration
-3. Add Slack API (with allowed channels)
-4. Team aggregation across users
-5. Search and filters
+2. Add Slack API (with allowed channels)
+3. Team aggregation across users
+4. Search and filters
 
 ## Performance
 
