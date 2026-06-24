@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Goals - Work Wrapped{% endblock %}
+{% block topbar_title %}Goals{% endblock %}
+
+{% block content %}
+<section>
+    <div
+        style="display:flex; justify-content:space-between; align-items:flex-end; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+        <div>
+            <h2 class="page-title" style="margin:0 0 0.2rem;">Goals</h2>
+            <p class="page-subtitle" style="margin:0;">Objectives, quick targets, snapshots, and team comparison.</p>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+            <label for="time-range-select" style="color:var(--text-muted); font-size:0.85rem;">Range</label>
+            <select id="time-range-select" onchange="changeTimeRange(this.value)"></select>
+        </div>
+    </div>
+    <div id="goals-content">
+        <p style="color:var(--text-muted);">Loading…</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentMonths = 12;
+    let currentObjectives = [], currentTotals = {}, currentThemes = [];
+    const OBJ_CATEGORY_LABELS = { delivery: 'Delivery', learning: 'Learning', collaboration: 'Collaboration', other: 'Other' };
+    const OBJ_STATUS_LABELS = { not_started: 'Not started', in_progress: 'In progress', done: 'Done' };
+    const OBJ_METRIC_LABELS = { tickets_done: 'Tickets done', reviews: 'Reviews (changes)', messages: 'Messages' };
+    function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    async function loadGoals(monthsParam) {
+        const url = monthsParam != null ? '/api/personal?months=' + monthsParam : '/api/personal';
+        const res = await fetch(url);
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (data.months != null) currentMonths = data.months;
+        renderGoals(data);
+    }
+    function changeTimeRange(m) { loadGoals(parseInt(m, 10)); }
+
+    function objectiveTrackingChanged() {
+        const metric = document.getElementById('obj-metric').value;
+        document.getElementById('obj-target-wrap').style.display = metric ? '' : 'none';
+        document.getElementById('obj-progress-wrap').style.display = metric ? 'none' : '';
+    }
+    function addEvidenceRow(label, value, source) {
+        const list = document.getElementById('obj-evidence-list');
+        if (!list) return;
+        const row = document.createElement('div');
+        row.className = 'obj-ev-row'; row.dataset.source = source || 'manual';
+        row.style.cssText = 'display:flex; gap:0.35rem; align-items:center;';
+        row.innerHTML = '<input type="text" class="obj-ev-label" placeholder="e.g. Project X changes" style="flex:1; min-width:120px;"><input type="number" class="obj-ev-value" placeholder="#" style="width:5rem;"><button type="button" class="btn btn-ghost btn-sm" onclick="this.closest(\'.obj-ev-row\').remove()">\u00d7</button>';
+        list.appendChild(row);
+        row.querySelector('.obj-ev-label').value = label || '';
+        if (value != null && value !== '') row.querySelector('.obj-ev-value').value = value;
+        if (!label) row.querySelector('.obj-ev-label').focus();
+    }
+    function collectEvidence() {
+        return [...document.querySelectorAll('#obj-evidence-list .obj-ev-row')].map(r => {
+            const label = r.querySelector('.obj-ev-label').value.trim();
+            const vraw = r.querySelector('.obj-ev-value').value;
+            const value = vraw === '' ? null : parseInt(vraw, 10);
+            return { label, value: isNaN(value) ? null : value, source: r.dataset.source || 'manual' };
+        }).filter(e => e.label);
+    }
+    function renderEvidenceChips() {
+        const wrap = document.getElementById('obj-evidence-chips');
+        if (!wrap) return;
+        const chips = [];
+        const T = currentTotals || {};
+        [['Jira tickets', T.jira, 'jira'], ['Gerrit changes', T.gerrit, 'gerrit'], ['Confluence pages', T.confluence, 'confluence'], ['Slack messages', T.slack, 'slack']].forEach(([lbl, val, src]) => { if (val) chips.push([lbl, val, src]); });
+        (currentThemes || []).slice(0, 6).forEach(t => chips.push([t.name, t.count, 'theme']));
+        wrap.innerHTML = chips.map((c, i) => `<button type="button" class="btn btn-ghost btn-sm" data-i="${i}" style="font-size:0.75rem; padding:0.2rem 0.5rem;">+ ${escapeHtml(c[0])} (${c[1]})</button>`).join('');
+        wrap.querySelectorAll('button').forEach(b => { const c = chips[parseInt(b.dataset.i, 10)]; b.onclick = () => addEvidenceRow(c[0], c[1], c[2]); });
+    }
+    function openObjectiveForm(id) {
+        const form = document.getElementById('objective-form');
+        if (!form) return;
+        const obj = id ? currentObjectives.find(o => o.id === id) : null;
+        document.getElementById('obj-id').value = obj ? obj.id : '';
+        document.getElementById('obj-title').value = obj ? (obj.title || '') : '';
+        document.getElementById('obj-description').value = obj ? (obj.description || '') : '';
+        document.getElementById('obj-category').value = obj ? (obj.category || 'other') : 'delivery';
+        document.getElementById('obj-status').value = obj ? (obj.status || 'not_started') : 'not_started';
+        document.getElementById('obj-target-date').value = obj ? (obj.target_date || '') : '';
+        document.getElementById('obj-metric').value = obj ? (obj.metric || '') : '';
+        document.getElementById('obj-target').value = (obj && obj.target != null) ? obj.target : '';
+        document.getElementById('obj-progress').value = (obj && obj.progress != null) ? obj.progress : 0;
+        document.getElementById('objective-form-title').textContent = obj ? 'Edit objective' : 'New objective';
+        document.getElementById('objective-form-error').textContent = '';
+        const evList = document.getElementById('obj-evidence-list'); if (evList) evList.innerHTML = '';
+        if (obj && Array.isArray(obj.evidence)) obj.evidence.forEach(e => addEvidenceRow(e.label, e.value, e.source));
+        renderEvidenceChips(); objectiveTrackingChanged();
+        form.style.display = ''; document.getElementById('obj-title').focus();
+    }
+    function cancelObjectiveForm() { const f = document.getElementById('objective-form'); if (f) f.style.display = 'none'; }
+    async function saveObjective() {
+        const id = document.getElementById('obj-id').value;
+        const metric = document.getElementById('obj-metric').value;
+        const payload = {
+            title: document.getElementById('obj-title').value,
+            description: document.getElementById('obj-description').value,
+            category: document.getElementById('obj-category').value,
+            status: document.getElementById('obj-status').value,
+            target_date: document.getElementById('obj-target-date').value,
+            metric: metric,
+            target: metric && document.getElementById('obj-target').value ? parseInt(document.getElementById('obj-target').value, 10) : null,
+            progress: !metric ? parseInt(document.getElementById('obj-progress').value || '0', 10) : 0,
+            evidence: collectEvidence(),
+        };
+        if (!payload.title.trim()) { document.getElementById('objective-form-error').textContent = 'Title is required.'; return; }
+        const url = id ? '/api/objectives/' + id : '/api/objectives';
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const result = await res.json().catch(() => ({}));
+        if (res.ok && result.ok) { cancelObjectiveForm(); loadGoals(currentMonths); }
+        else document.getElementById('objective-form-error').textContent = (result && result.error) || 'Could not save objective.';
+    }
+    async function deleteObjective(id) { if (!confirm('Delete this objective?')) return; const res = await fetch('/api/objectives/' + id, { method: 'DELETE' }); if (res.ok) loadGoals(currentMonths); }
+
+    async function saveGoals() {
+        const payload = {
+            tickets_done: document.getElementById('goal-tickets').value ? parseInt(document.getElementById('goal-tickets').value, 10) : null,
+            reviews: document.getElementById('goal-reviews').value ? parseInt(document.getElementById('goal-reviews').value, 10) : null,
+            messages: document.getElementById('goal-messages').value ? parseInt(document.getElementById('goal-messages').value, 10) : null,
+        };
+        await fetch('/api/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        loadGoals(currentMonths);
+    }
+    async function saveSnapshot() {
+        const input = document.getElementById('snapshot-label');
+        const label = (input && input.value && input.value.trim()) ? input.value.trim() : 'Snapshot';
+        const res = await fetch('/api/snapshots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label }) });
+        if (res.ok) { if (input) input.value = ''; loadGoals(currentMonths); }
+    }
+    async function setTeamOptin(include) {
+        await fetch('/api/team-comparison', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ include: !!include }) });
+        loadGoals(currentMonths);
+    }
+
+    function renderGoals(data) {
+        currentObjectives = data.objectives || [];
+        currentTotals = data.totals || {};
+        currentThemes = data.themes || [];
+        const options = data.time_range_options || [[12, 'Last 12 months']];
+        document.getElementById('time-range-select').innerHTML = options.map(([m, label]) => `<option value="${m}" ${(data.months || 12) === m ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
+
+        const goals = data.goals || {}, goals_progress = data.goals_progress || {}, objectives = data.objectives || [], snapshots = data.snapshots || [];
+
+        let html = `<h3 class="chart-section-title">Objectives</h3><div class="card" style="margin-bottom:1rem;">`;
+        html += `<div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.75rem;"><p style="font-size:0.85rem; color:var(--text-muted); margin:0;">Set objectives with a status, target date and progress. Link one to a metric to track it automatically.</p><button type="button" class="btn btn-primary btn-sm" onclick="openObjectiveForm()">+ Add objective</button></div>`;
+        html += `
+            <div id="objective-form" class="objective-form" style="display:none;">
+                <div class="objective-form-head" id="objective-form-title">New objective</div>
+                <input type="hidden" id="obj-id">
+                <div class="obj-field"><label for="obj-title">Title</label><input type="text" id="obj-title" maxlength="140" placeholder="e.g. Improve review turnaround"></div>
+                <div class="obj-field"><label for="obj-description">Description <span class="obj-opt">(optional)</span></label><textarea id="obj-description" rows="2" maxlength="600" placeholder="What does success look like?"></textarea></div>
+                <div class="obj-row">
+                    <div class="obj-field"><label for="obj-category">Category</label><select id="obj-category"><option value="delivery">Delivery</option><option value="learning">Learning</option><option value="collaboration">Collaboration</option><option value="other">Other</option></select></div>
+                    <div class="obj-field"><label for="obj-status">Status</label><select id="obj-status"><option value="not_started">Not started</option><option value="in_progress">In progress</option><option value="done">Done</option></select></div>
+                    <div class="obj-field"><label for="obj-target-date">Target date <span class="obj-opt">(optional)</span></label><input type="date" id="obj-target-date"></div>
+                </div>
+                <div class="obj-row">
+                    <div class="obj-field"><label for="obj-metric">Track progress by</label><select id="obj-metric" onchange="objectiveTrackingChanged()"><option value="">Manual</option><option value="tickets_done">Tickets done</option><option value="reviews">Reviews (changes)</option><option value="messages">Messages</option></select></div>
+                    <div class="obj-field" id="obj-target-wrap" style="display:none;"><label for="obj-target">Target</label><input type="number" id="obj-target" min="0" placeholder="e.g. 30"></div>
+                    <div class="obj-field" id="obj-progress-wrap"><label for="obj-progress">Progress %</label><input type="number" id="obj-progress" min="0" max="100" placeholder="0"></div>
+                </div>
+                <div class="obj-field">
+                    <label>Evidence <span class="obj-opt">(attach real numbers / themes)</span></label>
+                    <div id="obj-evidence-chips" style="display:flex; gap:0.3rem; flex-wrap:wrap; margin:0.1rem 0 0.4rem;"></div>
+                    <div id="obj-evidence-list" style="display:flex; flex-direction:column; gap:0.35rem;"></div>
+                    <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;" onclick="addEvidenceRow()">+ Add evidence</button>
+                </div>
+                <div id="objective-form-error" class="objective-form-error"></div>
+                <div class="objective-form-actions"><button type="button" class="btn btn-primary btn-sm" onclick="saveObjective()">Save objective</button><button type="button" class="btn btn-ghost btn-sm" onclick="cancelObjectiveForm()">Cancel</button></div>
+            </div>`;
+        if (objectives.length) {
+            html += `<div class="objective-list">`;
+            objectives.forEach(o => {
+                const pct = o.computed_progress != null ? o.computed_progress : (o.progress || 0);
+                const statusClass = 'status-' + (o.status || 'not_started');
+                const metricNote = o.metric ? `${OBJ_METRIC_LABELS[o.metric] || o.metric}${o.target != null ? ' · target ' + o.target : ''}` : '';
+                html += `<div class="objective-item">
+                    <div class="objective-item-head"><div class="objective-item-title">${escapeHtml(o.title)}</div>
+                        <div class="objective-item-actions"><button type="button" class="btn btn-ghost btn-sm" onclick="openObjectiveForm('${o.id}')">Edit</button><button type="button" class="btn btn-ghost btn-sm" onclick="deleteObjective('${o.id}')">Delete</button></div></div>
+                    ${o.description ? `<p class="objective-item-desc">${escapeHtml(o.description)}</p>` : ''}
+                    <div class="objective-meta"><span class="obj-badge obj-cat">${OBJ_CATEGORY_LABELS[o.category] || 'Other'}</span><span class="obj-badge ${statusClass}">${OBJ_STATUS_LABELS[o.status] || 'Not started'}</span>${o.target_date ? `<span class="obj-meta-text">Due ${escapeHtml(o.target_date)}</span>` : ''}${metricNote ? `<span class="obj-meta-text">${escapeHtml(metricNote)}</span>` : ''}</div>
+                    <div class="objective-progress"><div class="objective-progress-track"><div class="objective-progress-fill" style="width:${pct}%;"></div></div><span class="objective-progress-pct">${pct}%</span></div>
+                    ${(o.evidence && o.evidence.length) ? `<div class="objective-evidence" style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.5rem;">${o.evidence.map(e => `<span class="obj-badge" style="background:var(--accent-soft); color:var(--accent);">${escapeHtml(e.label)}${e.value != null ? ': ' + e.value : ''}</span>`).join('')}</div>` : ''}
+                </div>`;
+            });
+            html += `</div>`;
+        } else {
+            html += `<p style="font-size:0.85rem; color:var(--text-faint); margin:0;">No objectives yet. Add one to track a goal beyond raw numbers.</p>`;
+        }
+        html += `</div>`;
+
+        // Quick targets
+        html += `<h3 class="chart-section-title">Quick targets</h3><div class="card" style="margin-bottom:1rem;">`;
+        html += `<p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.75rem;">Set numeric targets to track progress.</p>`;
+        html += `<div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; margin-bottom:0.75rem;">
+            <label>Tickets done <input type="number" id="goal-tickets" min="0" placeholder="24" value="${goals.tickets_done != null ? goals.tickets_done : ''}" style="width:4.5rem; margin-left:0.25rem;"></label>
+            <label>Reviews <input type="number" id="goal-reviews" min="0" placeholder="50" value="${goals.reviews != null ? goals.reviews : ''}" style="width:4.5rem; margin-left:0.25rem;"></label>
+            <label>Messages <input type="number" id="goal-messages" min="0" placeholder="500" value="${goals.messages != null ? goals.messages : ''}" style="width:4.5rem; margin-left:0.25rem;"></label>
+            <button type="button" class="btn btn-primary btn-sm" onclick="saveGoals()">Save targets</button></div>`;
+        Object.keys(goals_progress || {}).forEach(k => {
+            const g = goals_progress[k];
+            if (g.goal == null) return;
+            const pct = Math.min(100, Math.round((g.current / g.goal) * 100));
+            html += `<div style="margin-bottom:0.5rem;"><span style="font-size:0.9rem;">${escapeHtml(g.label)}: ${g.current} / ${g.goal}</span><div style="background:rgba(148,163,184,0.18); border-radius:6px; height:8px; overflow:hidden;"><div style="background:var(--accent); height:100%; width:${pct}%;"></div></div></div>`;
+        });
+        html += `</div>`;
+
+        // Snapshots
+        html += `<h3 class="chart-section-title">Snapshots</h3><div class="card" style="margin-bottom:1rem;">`;
+        html += `<p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.6rem;">Save a checkpoint (e.g. "Q1 check-in") to compare progress later.</p>`;
+        html += `<div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-bottom:0.6rem;"><input type="text" id="snapshot-label" placeholder="e.g. Q1 check-in" style="width:12rem;"><button type="button" class="btn btn-primary btn-sm" onclick="saveSnapshot()">Save snapshot</button></div>`;
+        if (snapshots.length) {
+            html += `<ul style="margin:0; padding-left:1.25rem; font-size:0.9rem;">` + snapshots.map(s => {
+                const tot = s.totals || {};
+                return `<li><strong>${escapeHtml(s.label)}</strong> <span style="color:var(--text-faint);">${escapeHtml(s.date || '')}</span> — Jira ${tot.jira || 0}, Gerrit ${tot.gerrit || 0}, Confluence ${tot.confluence || 0}, Slack ${tot.slack || 0}</li>`;
+            }).join('') + `</ul>`;
+        } else {
+            html += `<p style="font-size:0.85rem; color:var(--text-faint); margin:0;">No snapshots yet.</p>`;
+        }
+        html += `</div>`;
+
+        // Team comparison (opt-in)
+        const tc = data.team_comparison;
+        html += `<h3 class="chart-section-title">Team comparison</h3><div class="card" style="margin-bottom:1rem;">`;
+        html += `<label style="display:flex; gap:0.6rem; align-items:flex-start; cursor:pointer;"><input type="checkbox" ${data.team_optin ? 'checked' : ''} onchange="setTeamOptin(this.checked)" style="margin-top:0.2rem; accent-color:var(--accent);"><span><strong>Include me in the team average</strong><span style="display:block; font-size:0.82rem; color:var(--text-faint);">Adds only your totals (no name) to an aggregate.</span></span></label>`;
+        if (tc) {
+            const y = tc.your_totals || {}, a = tc.team_average || {};
+            html += `<p style="font-size:0.9rem; margin:0.75rem 0 0;">You vs team average (${tc.participant_count} participants): Jira <strong>${y.jira || 0}</strong> vs ${a.jira}, Gerrit <strong>${y.gerrit || 0}</strong> vs ${a.gerrit}, Confluence <strong>${y.confluence || 0}</strong> vs ${a.confluence}, Slack <strong>${y.slack || 0}</strong> vs ${a.slack}.</p>`;
+        }
+        html += `</div>`;
+
+        document.getElementById('goals-content').innerHTML = html;
+    }
+
+    loadGoals();
+</script>
+{% endblock %}

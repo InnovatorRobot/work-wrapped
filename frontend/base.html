@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v=2">
     <script>(function () { try { var t = localStorage.getItem('ww-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) { } })();</script>
     {% block head %}{% endblock %}
 </head>
@@ -29,6 +29,8 @@
             {% if logged_in %}
             <nav class="sidebar-nav">
                 <a href="/" class="{% if route == 'index' %}active{% endif %}"><span class="ni">▤</span> Overview</a>
+                <a href="{{ url_for('spa') }}" class="{% if route == 'spa' %}active{% endif %}"><span
+                        class="ni">✦</span> React UI <span style="font-size:0.62rem; opacity:0.7;">new</span></a>
 
                 <div class="nav-group-label">Sources</div>
                 <a href="{{ url_for('gerrit_full') }}" class="{% if route == 'gerrit_full' %}active{% endif %}"><span
@@ -65,8 +67,8 @@
 
             <div class="sidebar-footer">
                 <button type="button" class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark"
-                    aria-label="Toggle theme">&#9680; Theme</button>
-                <a href="{{ url_for('logout') }}" class="nav-logout">⏻ Log out</a>
+                    aria-label="Toggle theme"><span class="ni">&#9680;</span> Theme</button>
+                <a href="{{ url_for('logout') }}" class="nav-logout"><span class="ni">⏻</span> Log out</a>
             </div>
             {% endif %}
         </aside>

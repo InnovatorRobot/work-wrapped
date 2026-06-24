@@ -6,7 +6,7 @@ import io
 import time
 
 from fastapi import APIRouter, Request, Depends
-from fastapi.responses import JSONResponse, Response, PlainTextResponse
+from fastapi.responses import JSONResponse, Response, PlainTextResponse, RedirectResponse
 
 from config import DEFAULT_MONTHS, VALID_MONTHS, TIME_RANGE_OPTIONS, JIRA_URL
 from templates import templates, _template_context, _render_template_string
@@ -26,6 +26,12 @@ async def insights_page(request: Request, session: dict = Depends(require_sessio
     return templates.TemplateResponse("insights.html", ctx)
 
 
+@router.get("/app", name="spa")
+async def spa(request: Request, session: dict = Depends(require_session)):
+    """Serve the React single-page app (client-routed via hash)."""
+    return templates.TemplateResponse("spa.html", {"request": request})
+
+
 def _apply_time_range_from_query(request: Request):
     """If request has ?months= in VALID_MONTHS, set session and return True."""
     try:
@@ -40,14 +46,8 @@ def _apply_time_range_from_query(request: Request):
 
 @router.get("/", name="index")
 async def index(request: Request, session: dict = Depends(require_session)):
-    current_user = {
-        "id": session.get("user_id"),
-        "name": session.get("user_name"),
-        "email": session.get("user_email"),
-        "team": "",
-    }
-    ctx = _template_context(request, current_route="index", current_user=current_user)
-    return templates.TemplateResponse("index.html", ctx)
+    # The React SPA is the primary UI.
+    return RedirectResponse(url="/app")
 
 
 @router.get("/gerrit", name="gerrit_full")

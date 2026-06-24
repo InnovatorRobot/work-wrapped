@@ -38,6 +38,12 @@ async def connections_page(request: Request, session: dict = Depends(require_ses
     return templates.TemplateResponse("connections.html", ctx)
 
 
+@router.get("/api/connections")
+async def api_connections(request: Request, session: dict = Depends(require_session)):
+    """Connection status per service (for the React UI)."""
+    return JSONResponse(get_session_connections(session_with_credentials(dict(session))))
+
+
 @router.post("/api/connect/gerrit")
 async def api_connect_gerrit(request: Request, session: dict = Depends(require_session)):
     if not GERRIT_URL:
