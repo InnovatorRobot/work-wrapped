@@ -59,20 +59,39 @@ function RangeSelect({ value, options, onChange }) {
         </div>`;
 }
 
-function usePersonal() {
-    const [data, setData] = useState(null);
-    const [months, setMonths] = useState(null);
-    const load = useCallback(async (m, refresh) => {
+// Shared personal-data store so tab switches are instant (fetch once, reuse).
+const personalStore = {
+    data: null, months: null, loading: false, listeners: new Set(),
+    emit() { this.listeners.forEach(fn => fn()); },
+    async load(m, refresh) {
         let url = '/api/personal';
         const qs = [];
         if (m != null) qs.push('months=' + m);
         if (refresh) qs.push('refresh=1');
         if (qs.length) url += '?' + qs.join('&');
-        const d = await getJSON(url);
-        setData(d); if (d && d.months != null) setMonths(d.months);
+        this.loading = true; this.emit();
+        try {
+            const d = await getJSON(url);
+            this.data = d;
+            if (d && d.months != null) this.months = d.months;
+        } finally {
+            this.loading = false; this.emit();
+        }
+        return this.data;
+    },
+};
+
+function usePersonal() {
+    const [, bump] = useState(0);
+    useEffect(() => {
+        const fn = () => bump(n => n + 1);
+        personalStore.listeners.add(fn);
+        // Fetch only the first time; later tabs reuse the cached data instantly.
+        if (personalStore.data == null && !personalStore.loading) personalStore.load();
+        return () => personalStore.listeners.delete(fn);
     }, []);
-    useEffect(() => { load(); }, [load]);
-    return { data, months, load };
+    const load = useCallback((m, refresh) => personalStore.load(m, refresh), []);
+    return { data: personalStore.data, months: personalStore.months, load };
 }
 
 /* ----------------------------- Sidebar --------------------------------- */
